@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "materia"
+version = "0.1.0"
+description = "Materia is a file server"
+authors = [
+    "L-Nafaryus <l.nafaryus@gmail.com>"
+]
+maintainers = [
+    "L-Nafaryus <l.nafaryus@gmail.com>"
+]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "intcurves" }
+]
+
+[tool.poetry.scripts]
+intcurves = "src.main"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+fastapi = "^0.111.0"
+uvicorn = {version = "^0.29.0", extras = ["standard"]}
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.3.0"
+pytest = "^7.3.2"
+pyflakes = "^3.0.1"
+pyright = "^1.1.314"
+
+[tool.pyright]
+reportGeneralTypeIssues = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
