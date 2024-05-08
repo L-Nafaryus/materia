@@ -1,3 +1,4 @@
 /result*
 /.venv
 __pycache__/
+/temp

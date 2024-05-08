@@ -21,28 +21,58 @@
         nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
     in
     {
-        apps = forAllSystems (system:
-        let 
+        
+        packages = forAllSystems (system: let
             pkgs = nixpkgsFor.${system};
-            app = (poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }).mkPoetryApplication { projectDir = ./.; };
-        in rec {
-            materia = {
+            #inherit (poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }) mkPoetryApplication;
+        in {
+            #materia = mkPoetryApplication { 
+            #    projectDir = ./.; 
+            #};
+
+            #default = self.packages.${system}.materia;
+        });
+
+        apps = forAllSystems (system: {
+            materia = let 
+                pkgs = nixpkgsFor.${system};
+                app = (poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }).mkPoetryApplication { projectDir = self; };
+            in {
                 type = "app";
                 program = "${app}/bin/materia";
             };
 
-            default = materia;
+            #default = materia;
         });
 
         devShells = forAllSystems (system: 
-        let pkgs = nixpkgsFor.${system};
+        let 
+            pkgs = nixpkgsFor.${system};
+            db_name = "materia";
+            db_user = "materia";
+            db_password = "test";
+            db_path = "temp/materia";
         in {
             default = pkgs.mkShell {
-                buildInputs = [ 
-                    pkgs.poetry
-                    pkgs.nil 
-                    pkgs.nodejs
+                buildInputs = with pkgs; [ 
+                    nil 
+                    nodejs
+                    ripgrep
+
+                    postgresql
+
+                    poetry
                 ];
+
+                LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ];
+
+                shellHook = ''
+                    trap "pg_ctl -D ${db_path} stop" EXIT
+
+                    [ ! -d $(pwd)/${db_path} ] && initdb -D $(pwd)/${db_path} -U ${db_user}
+                    pg_ctl -D $(pwd)/${db_path} -l $(pwd)/${db_path}/db.log -o "--unix_socket_directories=$(pwd)/${db_path}" start
+                    [ ! "$(psql -h $(pwd)/${db_path} -U ${db_user} -l | rg '^ ${db_name}')" ] && createdb -h $(pwd)/${db_path} -U ${db_user} ${db_name}
+                '';
             };
         });
 
