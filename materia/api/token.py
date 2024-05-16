@@ -24,3 +24,4 @@ class TokenClaims(BaseModel):
         data = jwt.decode(token, secret, algorithms = ["HS256"])
         
         return TokenClaims(**data)
+

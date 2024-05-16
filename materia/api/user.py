@@ -54,7 +54,7 @@ async def remove(body: schema.RemoveUser, database: DatabaseState = Depends()):
         await session.execute(delete(db.User).where(db.User.id == body.id))
         await session.commit()
 
-@router.post("/user/login", status_code = 200)
+@router.post("/user/login", status_code = 200, response_model = schema.Token)
 async def login(body: schema.LoginUser, response: Response, database: DatabaseState = Depends(), config: ConfigState = Depends()) -> Any:
     query = select(db.User)
     if login := body.login:
@@ -85,6 +85,8 @@ async def login(body: schema.LoginUser, response: Response, database: DatabaseSt
         httponly = True, 
         samesite = "none"
     )
+
+    return schema.Token(access_token = token)
 
 @router.get("/user/logout", status_code = 200)
 async def logout(response: Response):

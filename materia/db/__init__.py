@@ -11,7 +11,9 @@ from asyncpg import Connection
 
 from materia.db.base import Base
 from materia.db.user import User 
-from materia.db.fs_entity import FsEntity 
+from materia.db.repository import Repository
+from materia.db.directory import Directory
+from materia.db.file import File 
 from materia.db.link import Link
 
 

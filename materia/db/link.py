@@ -8,6 +8,12 @@ class Link(Base):
     __tablename__ = "link"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key = True)
-    entity_id: Mapped[int] = mapped_column(ForeignKey("fs_entity.id", ondelete = "CASCADE"))
+    directory_id: Mapped[int] = mapped_column(ForeignKey("directory.id", ondelete = "CASCADE"), nullable = True)
+    file_id: Mapped[int] = mapped_column(ForeignKey("directory.id", ondelete = "CASCADE"), nullable = True)
     created_unix: Mapped[int] = mapped_column(BigInteger, nullable = False, default = time.time)
-    is_public: Mapped[bool]
+    is_file: Mapped[bool]
+    url: Mapped[str]
+
+
+from materia.db.directory import Directory
+from materia.db.file import File

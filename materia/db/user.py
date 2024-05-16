@@ -3,7 +3,7 @@ from typing import Optional
 import time
 
 from sqlalchemy import BigInteger
-from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from materia.db.base import Base
 
@@ -21,3 +21,7 @@ class User(Base):
     avatar: Mapped[Optional[str]]
     created_unix: Mapped[int] = mapped_column(BigInteger, default = time.time)
 
+    repository: Mapped["Repository"] = relationship(back_populates = "owner")
+
+
+from materia.db.repository import Repository

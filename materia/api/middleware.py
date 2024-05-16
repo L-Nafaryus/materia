@@ -6,22 +6,25 @@ from sqlalchemy import select
 from pydantic import BaseModel
 from enum import StrEnum
 from http import HTTPMethod as HttpMethod
+from fastapi.security import HTTPBearer
 
 from materia.api.depends import ConfigState, DatabaseState
 from materia.api.token import TokenClaims
 from materia import db
 
 
-class JwtMiddleware:
-    def __init__(self):
+class JwtMiddleware(HTTPBearer):
+    def __init__(self, auto_error: bool = True):
+        super().__init__(auto_error = auto_error)
         self.claims: Optional[TokenClaims] = None 
 
     async def __call__(self, request: Request, config: ConfigState = Depends(), database: DatabaseState = Depends()):
         if token := request.cookies.get("token"):
             pass 
-        elif token := request.headers.get("Authorization"):
-            token = token.strip("Bearer ")
-        else:
+        elif (credentials := await super().__call__(request)) and credentials.scheme == "Bearer":
+            token = credentials.credentials
+
+        if not token:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Missing token")
 
         try:
