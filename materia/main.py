@@ -4,24 +4,25 @@ from os import environ
 import uvicorn
 from fastapi import FastAPI
 
-from src.config import config
-from src.db import DatabaseManager
+from materia.config import config
+from materia.db import DatabaseManager
+from materia import api
 
 
 @asynccontextmanager 
 async def lifespan(app: FastAPI):
-    pool = DatabaseManager.from_url(config.database_url()) # type: ignore
+    database = DatabaseManager.from_url(config.database_url()) # type: ignore
 
     app.state.config = config
-    app.state.pool = pool
+    app.state.database = database
     
-    async with pool.connection() as connection:
-        await connection.run_sync(pool.run_migrations) # type: ignore
+    async with database.connection() as connection:
+        await connection.run_sync(database.run_migrations) # type: ignore
 
     yield
 
-    if pool.engine is not None:
-        await pool.dispose()
+    if database.engine is not None:
+        await database.dispose()
 
 
 app = FastAPI(
@@ -30,10 +31,11 @@ app = FastAPI(
     docs_url = "/api/docs",
     lifespan = lifespan
 )
+app.include_router(api.routes())
 
 def main():
     uvicorn.run(
-        "src.main:app", 
+        "materia.main:app", 
         port = config.server.port, 
         host = config.server.address, 
         reload = bool(environ.get("MATERIA_DEBUG"))

@@ -16,42 +16,35 @@
 
     outputs = { self, nixpkgs, poetry2nix, ... }:
     let
-        #perSystem = systems: builtins.mapAttrs (name: value: nixpkgs.lib.genAttrs systems (system: value) );
         forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" ];
         nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
     in
     {
-        
         packages = forAllSystems (system: let
             pkgs = nixpkgsFor.${system};
-            #inherit (poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }) mkPoetryApplication;
+            inherit (poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }) mkPoetryApplication;
         in {
-            #materia = mkPoetryApplication { 
-            #    projectDir = ./.; 
-            #};
+            materia = mkPoetryApplication { 
+                projectDir = ./.; 
+            };
 
-            #default = self.packages.${system}.materia;
+            default = self.packages.${system}.materia;
         });
 
         apps = forAllSystems (system: {
-            materia = let 
-                pkgs = nixpkgsFor.${system};
-                app = (poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }).mkPoetryApplication { projectDir = self; };
-            in {
+            materia = {
                 type = "app";
-                program = "${app}/bin/materia";
+                program = "${self.packages.${system}.materia}/bin/materia";
             };
 
-            #default = materia;
+            default = self.apps.${system}.materia;
         });
 
-        devShells = forAllSystems (system: 
-        let 
+        devShells = forAllSystems (system: let 
             pkgs = nixpkgsFor.${system};
             db_name = "materia";
             db_user = "materia";
-            db_password = "test";
-            db_path = "temp/materia";
+            db_path = "temp/materia-db";
         in {
             default = pkgs.mkShell {
                 buildInputs = with pkgs; [ 

@@ -7,8 +7,12 @@ from alembic.operations import Operations
 from alembic.runtime.migration import MigrationContext
 from alembic.script.base import ScriptDirectory
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.ext.declarative import declarative_base 
 from asyncpg import Connection
+
+from materia.db.base import Base
+from materia.db.user import User 
+from materia.db.fs_entity import FsEntity 
+from materia.db.link import Link
 
 
 class DatabaseManager:
@@ -22,7 +26,12 @@ class DatabaseManager:
         instance = DatabaseManager()
         instance.database_url = database_url
         instance.engine = create_async_engine(database_url, pool_size = 100)
-        instance.sessionmaker = async_sessionmaker(bind = instance.engine, autocommit = False, autoflush = False)
+        instance.sessionmaker = async_sessionmaker(
+            bind = instance.engine, 
+            autocommit = False, 
+            autoflush = False, 
+            expire_on_commit = False
+        )
 
         return instance
 
@@ -81,7 +90,4 @@ class DatabaseManager:
                 context.run_migrations()
 
 
-Base = declarative_base()
-
-from src.db.user import User
 

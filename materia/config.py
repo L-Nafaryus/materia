@@ -79,6 +79,5 @@ class Config(BaseModel):
 
 
 # initialize config
-config = Config.open(Config.data_dir().joinpath("config.toml"))
-if not config:
+if not (config := Config.open(Config.data_dir().joinpath("config.toml"))):
     config = Config.default()
