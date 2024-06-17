@@ -1,0 +1,44 @@
+[project]
+name = "materia-web-client"
+version = "0.1.1"
+description = "Materia web client"
+authors = [
+    {name = "L-Nafaryus", email = "l.nafaryus@gmail.com"},
+]
+dependencies = [
+    "loguru<1.0.0,>=0.7.2",
+]
+requires-python = "<3.12,>=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "black<24.0.0,>=23.3.0",
+    "pytest<8.0.0,>=7.3.2",
+    "pyflakes<4.0.0,>=3.0.1",
+]
+
+[tool.pdm.build]
+includes = ["src/materia_web_client", "src/materia-frontend/dist"]
+
+[tool.pdm.scripts]
+npm-install.cmd = "npm install --prefix ./src/materia-frontend"
+npm-run-build.cmd = "npm run build-only --prefix ./src/materia-frontend"
+pre_build.composite = [ "npm-install", "npm-run-build" ]
+materia-web-client.call = "materia_web_client.main:client"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pyright]
+reportGeneralTypeIssues = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+

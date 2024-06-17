@@ -1,74 +1,225 @@
 {
-    description = "Materia is a file server";
+    description = "Materia";
 
-    nixConfig = {
-        extra-substituters = [ "https://bonfire.cachix.org" ];
-        extra-trusted-public-keys = [ "bonfire.cachix.org-1:mzAGBy/Crdf8NhKail5ciK7ZrGRbPJJobW6TwFb7WYM=" ];
-    };
-
-    inputs = {
+    inputs = { 
         nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-        poetry2nix = {
-            url = "github:nix-community/poetry2nix";
+        dream2nix = { 
+            url = "github:nix-community/dream2nix";
             inputs.nixpkgs.follows = "nixpkgs";
         };
+        bonfire.url = "github:L-Nafaryus/bonfire";
     };
 
-    outputs = { self, nixpkgs, poetry2nix, ... }:
+
+    outputs = { self, nixpkgs, dream2nix, bonfire, ... }:
     let
-        forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" ];
-        nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
+        system = "x86_64-linux";
+        pkgs = import nixpkgs { inherit system; };
+        bonpkgs = bonfire.packages.${system};
+        bonlib = bonfire.lib;
+
+        dreamBuildPackage = { module, meta ? {}, extraModules ? [], extraArgs ? {} }: (
+            nixpkgs.lib.evalModules {
+                modules = [ module ] ++ extraModules;
+                specialArgs = {
+                    inherit dream2nix;
+                    packageSets.nixpkgs = pkgs;
+                } // extraArgs; 
+            }
+        ).config.public // { inherit meta; };
+
     in
     {
-        packages = forAllSystems (system: let
-            pkgs = nixpkgsFor.${system};
-            inherit (poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }) mkPoetryApplication;
-        in {
-            materia = mkPoetryApplication { 
-                projectDir = ./.; 
+        packages.x86_64-linux = {
+            materia-frontend = dreamBuildPackage { 
+                module = { lib, config, dream2nix, ... }: {
+                    name = "materia-frontend";
+                    version = "0.0.1";
+
+                    imports = [
+                        dream2nix.modules.dream2nix.WIP-nodejs-builder-v3
+                    ];
+
+                    mkDerivation = {
+                        src = ./materia-web-client/src/materia-frontend;
+                    };
+
+                    deps = {nixpkgs, ...}: {
+                        inherit
+                        (nixpkgs)
+                        fetchFromGitHub
+                        stdenv
+                        ;
+                    };
+
+                    WIP-nodejs-builder-v3 = {
+                        packageLockFile = "${config.mkDerivation.src}/package-lock.json";
+                    };
+                }; 
+                meta = with nixpkgs.lib; {
+                    description = "Materia frontend";
+                    license = licenses.mit;
+                    maintainers = with bonlib.maintainers; [ L-Nafaryus ];
+                    broken = false;
+                };
             };
 
-            default = self.packages.${system}.materia;
-        });
+            materia-web-client = dreamBuildPackage { 
+                extraArgs = { 
+                    inherit (self.packages.x86_64-linux) materia-frontend; 
+                }; 
+                module = {config, lib, dream2nix, materia-frontend, ...}: {
+                    imports = [ dream2nix.modules.dream2nix.WIP-python-pdm ];
 
-        apps = forAllSystems (system: {
-            materia = {
-                type = "app";
-                program = "${self.packages.${system}.materia}/bin/materia";
+                    pdm.lockfile = ./materia-web-client/pdm.lock;
+                    pdm.pyproject = ./materia-web-client/pyproject.toml;
+
+                    deps = _ : {
+                        python = pkgs.python3;
+                    };
+
+                    mkDerivation = {
+                        src = ./materia-web-client;
+                        buildInputs = [
+                            pkgs.python3.pkgs.pdm-backend
+                        ];
+                        configurePhase = ''
+                            cp -rv ${materia-frontend}/dist ./src/materia-frontend/
+                        '';
+                    };
+                }; 
+                meta = with nixpkgs.lib; {
+                    description = "Materia web client";
+                    license = licenses.mit;
+                    maintainers = with bonlib.maintainers; [ L-Nafaryus ];
+                    broken = false;
+                };
             };
 
-            default = self.apps.${system}.materia;
-        });
+            materia-server = dreamBuildPackage { 
+                module = {config, lib, dream2nix, materia-frontend, ...}: {
+                    imports = [ dream2nix.modules.dream2nix.WIP-python-pdm ];
 
-        devShells = forAllSystems (system: let 
-            pkgs = nixpkgsFor.${system};
-            db_name = "materia";
-            db_user = "materia";
-            db_path = "temp/materia-db";
-        in {
-            default = pkgs.mkShell {
-                buildInputs = with pkgs; [ 
-                    nil 
-                    nodejs
-                    ripgrep
+                    pdm.lockfile = ./materia-server/pdm.lock;
+                    pdm.pyproject = ./materia-server/pyproject.toml;
 
-                    postgresql
+                    deps = _ : {
+                        python = pkgs.python3;
+                    };
 
-                    poetry
-                ];
+                    mkDerivation = {
+                        src = ./materia-server;
+                        buildInputs = [
+                            pkgs.python3.pkgs.pdm-backend
+                        ];
+                        nativeBuildInputs = [
+                            pkgs.python3.pkgs.wrapPython
+                        ];
+                        
+                    };
+                };
+                meta = with nixpkgs.lib; {
+                    description = "Materia";
+                    license = licenses.mit;
+                    maintainers = with bonlib.maintainers; [ L-Nafaryus ];
+                    broken = false;
+                    mainProgram = "materia-server";
+                };
+            };
 
-                LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ];
-
-                shellHook = ''
-                    trap "pg_ctl -D ${db_path} stop" EXIT
-
-                    [ ! -d $(pwd)/${db_path} ] && initdb -D $(pwd)/${db_path} -U ${db_user}
-                    pg_ctl -D $(pwd)/${db_path} -l $(pwd)/${db_path}/db.log -o "--unix_socket_directories=$(pwd)/${db_path}" start
-                    [ ! "$(psql -h $(pwd)/${db_path} -U ${db_user} -l | rg '^ ${db_name}')" ] && createdb -h $(pwd)/${db_path} -U ${db_user} ${db_name}
+            postgresql = let 
+                user = "postgres";
+                database = "postgres";
+                dataDir = "/var/lib/postgresql";
+                entryPoint = pkgs.writeTextDir "entrypoint.sh" ''
+                    initdb -U ${user} 
+                    postgres -k ${dataDir}
                 '';
+            in pkgs.dockerTools.buildImage {
+                name = "postgresql";
+                tag = "devel";
+
+                copyToRoot = pkgs.buildEnv {
+                    name = "image-root";
+                    pathsToLink = [ "/bin" "/etc" "/" ];
+                    paths = with pkgs; [
+                        bash
+                        postgresql
+                        entryPoint
+                    ];
+                };
+                runAsRoot = with pkgs; ''
+                    #!${runtimeShell}
+                    ${dockerTools.shadowSetup}
+                    groupadd -r ${user} 
+                    useradd -r -g ${user} --home-dir=${dataDir} ${user} 
+                    mkdir -p ${dataDir}
+                    chown -R ${user}:${user} ${dataDir}
+                '';
+
+                config = {
+                    Entrypoint = [ "bash" "/entrypoint.sh" ];
+                    StopSignal = "SIGINT";
+                    User = "${user}:${user}";
+                    Env = [ "PGDATA=${dataDir}" ];
+                    WorkingDir = dataDir;
+                    ExposedPorts = {
+                        "5432/tcp" = {};
+                    };
+                };
             };
-        });
 
+            redis = let 
+                user = "redis";
+                dataDir = "/var/lib/redis";
+                entryPoint = pkgs.writeTextDir "entrypoint.sh" ''
+                    redis-server \
+                        --daemonize no \
+                        --dir "${dataDir}"
+                '';
+            in pkgs.dockerTools.buildImage {
+                name = "redis";
+                tag = "devel";
+
+                copyToRoot = pkgs.buildEnv {
+                    name = "image-root";
+                    pathsToLink = [ "/bin" "/etc" "/" ];
+                    paths = with pkgs; [
+                        bash
+                        redis
+                        entryPoint
+                    ];
+                };
+                runAsRoot = with pkgs; ''
+                    #!${runtimeShell}
+                    ${dockerTools.shadowSetup}
+                    groupadd -r ${user} 
+                    useradd -r -g ${user} --home-dir=${dataDir} ${user} 
+                    mkdir -p ${dataDir}
+                    chown -R ${user}:${user} ${dataDir}
+                '';
+
+                config = {
+                    Entrypoint = [ "bash" "/entrypoint.sh" ];
+                    StopSignal = "SIGINT";
+                    User = "${user}:${user}";
+                    WorkingDir = dataDir;
+                    ExposedPorts = {
+                        "6379/tcp" = {};
+                    };
+                };
+            };
+        };
+
+        apps.x86_64-linux = {
+            materia-server = {
+                type = "app";
+                program = "${self.packages.x86_64-linux.materia-server}/bin/materia-server";
+            };
+        };
+
+        devShells.x86_64-linux.default = pkgs.mkShell {
+            buildInputs = with pkgs; [ postgresql redis ];
+        };
     };
-
 }

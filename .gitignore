@@ -1,5 +1,12 @@
 /result*
+/repl-result*
+temp/
+
+dist/
 /.venv
 __pycache__/
-/temp
-/dist
+*.egg-info
+
+.pdm.toml
+.pdm-python
+.pdm-build
