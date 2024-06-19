@@ -47,12 +47,12 @@ const router = createRouter({
             component: () => import("@/views/Home.vue"),
         },
         {
-            path: "/user/login", name: "signin", beforeEnter: [bypass_auth],
-            component: () => import("@/views/user/SignIn.vue")
+            path: "/auth/signin", name: "signin", beforeEnter: [bypass_auth],
+            component: () => import("@/views/auth/SignIn.vue")
         },
         {
-            path: "/user/register", name: "signup", //beforeEnter: [bypass_auth],
-            component: () => import("@/views/user/SignUp.vue")
+            path: "/auth/signup", name: "signup", //beforeEnter: [bypass_auth],
+            component: () => import("@/views/auth/SignUp.vue")
         },
         {
             path: "/user/preferencies", name: "prefs", redirect: { name: "prefs-profile" }, beforeEnter: [required_auth],
@@ -78,7 +78,7 @@ const router = createRouter({
         },
         {
             path: "/:pathMatch(.*)*", name: "not-found", beforeEnter: [bypass_auth],
-            component: () => import("@/views/error/NotFound.vue")
+            component: () => import("@/views/NotFound.vue")
         }
     ]
 });

@@ -40,8 +40,9 @@ async def signup(body: user.UserCredentials, ctx: context.Context = Depends()):
 
 @router.post("/auth/signin")
 async def signin(body: user.UserCredentials, response: Response, ctx: context.Context = Depends()):
-    if (current_user := await user.User.by_name(body.name, ctx.database) or await user.User.by_email(body.email, ctx.database) if body.email else None) is None:
-        raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail = "Invalid credentials")
+    if (current_user := await user.User.by_name(body.name, ctx.database)) is None:
+        if (current_user := await user.User.by_email(str(body.email), ctx.database)) is None:
+            raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail = "Invalid email")
     if not security.validate_password(body.password, current_user.hashed_password, algo = ctx.config.security.password_hash_algo):
         raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail = "Invalid password")
 

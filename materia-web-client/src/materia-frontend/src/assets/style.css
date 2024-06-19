@@ -4,24 +4,37 @@
 
 @layer base {
     body {
-        background-color: rgba(40, 30, 30, 1); /*linear-gradient(rgba(36, 14, 84, 1) 80%, rgba(55, 22, 130, 1)); */
-        /*background-image: url("./background.svg");*/
-        background-position: left top;
-        background-repeat: repeat-x;
+        @apply bg-ctp-crust;
+        font-family: Inter,sans-serif;
+        font-weight: 400;
     }
 
     a {
-        @apply text-green-500 hover:text-green-400;
+        @apply text-ctp-green;
     }
 
-    h1 {
-        font-family: BioRhyme,serif;
-        font-weight: 700;
+    .input {
+        @apply w-full pl-3 pr-3 pt-2 pb-2 rounded border bg-ctp-mantle border-ctp-overlay0 hover:border-ctp-overlay1 focus:border-ctp-green text-ctp-text outline-none;
     }
 
     label {
-        font-family: Space Mono,monospace;
-        font-weight: 500;
+        @apply text-ctp-text;
+    }
+
+    .button {
+        @apply pt-2 pb-2 pl-5 pr-5 rounded bg-ctp-mantle hover:bg-ctp-base text-ctp-blue;
+    }
+
+    .link-button {
+        @apply button text-ctp-green;
+    }
+
+    h1 {
+        @apply text-ctp-text pt-5 pb-5 border-b border-ctp-overlay0 mb-5;
+    }
+
+    label {
+        @apply text-ctp-text;
     }
 }
 

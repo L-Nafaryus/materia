@@ -13,12 +13,19 @@ export class HttpError extends Error {
 }
 
 export interface ResponseError {
-    status_code: number,
-    message: string
+    status: number | null,
+    message: string | null
 }
 
 export function handle_error(error: AxiosError): Promise<ResponseError> {
-    return Promise.reject<ResponseError>({ status_code: error.response?.status, message: error.response?.data });
+    let message = error.response?.data?.detail || error.response?.data;
+    console.log(error);
+    // extract pydantic error message
+    if (error.response.status == 422) {
+        message = error.response?.data?.detail[1].ctx.reason;
+    }
+
+    return Promise.reject<ResponseError>({ status: error.response.status, message: message});
 }
 
 const debug = import.meta.hot;

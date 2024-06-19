@@ -3,7 +3,7 @@ from typing import Optional
 import time
 import re
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 import pydantic
 from sqlalchemy import BigInteger, Enum
 from sqlalchemy.orm import mapped_column, Mapped, relationship
@@ -23,7 +23,7 @@ class User(Base):
     id: Mapped[UUID] = mapped_column(primary_key = True, default = uuid4)
     name: Mapped[str] = mapped_column(unique = True)
     lower_name: Mapped[str] = mapped_column(unique = True)
-    full_name: Mapped[str]
+    full_name: Mapped[Optional[str]]
     email: Mapped[str]
     is_email_private: Mapped[bool] = mapped_column(default = True)
     hashed_password: Mapped[str]
@@ -80,5 +80,25 @@ class UserCredentials(BaseModel):
     password: str 
     email: Optional[EmailStr]
 
+class UserIdentity(BaseModel):
+    model_config = ConfigDict(from_attributes = True)
+
+    name: str
+    lower_name: str 
+    full_name: Optional[str]
+    email: str
+    is_email_private: bool
+    must_change_password: bool
+
+    login_type: "LoginType"
+
+    created: int
+    updated: int
+    last_login: Optional[int]
+    
+    is_active: bool
+    is_admin: bool
+
+    avatar: Optional[str]
 
 from materia_server.models.repository.repository import Repository

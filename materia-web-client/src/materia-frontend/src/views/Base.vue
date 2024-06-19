@@ -26,7 +26,7 @@ async function signout() {
     <div class="flex-grow pb-20">
         <NavBar>
             <template #left>
-                <!-- TODO: logo -->
+                <RouterLink class="link-button" to="/">Home</RouterLink>
             </template>
             <template #right>
                 <DropdownMenu v-if="userStore.current">
@@ -57,23 +57,23 @@ async function signout() {
                     </template>
                 </DropdownMenu>
 
-                <RouterLink v-if="!userStore.current"
-                    class="flex min-w-9 min-h-9 pt-1 pb-1 pl-3 pr-3 rounded hover:bg-zinc-600" to="/user/login">
-                    Sign In</RouterLink>
+                <RouterLink v-if="!userStore.current" class="link-button" to="/user/login">Sign In</RouterLink>
             </template>
         </NavBar>
 
-        <main>
+        <main class="w-[1000px] ml-auto mr-auto pt-5 pb-5">
             <slot></slot>
-
         </main>
     </div>
 
     <div class="relative overflow-hidden h-full ">
     </div>
     <footer
-        class="flex justify-between pb-2 pt-2 pl-5 pr-5 bg-gradient-to-b from-zinc-800 to-zinc-900 border-t border-t-zinc-500">
-        <a href="/">Made with glove</a>
+        class="flex justify-between pb-2 pt-2 pl-5 pr-5 bg-ctp-mantle">
+        <a href="/">Made with glove by Elnafo, 2024</a>
+        <div>
+            
+        </div>
         <a href="/api/docs">API</a>
     </footer>
 </template>

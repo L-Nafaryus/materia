@@ -219,7 +219,9 @@
         };
 
         devShells.x86_64-linux.default = pkgs.mkShell {
-            buildInputs = with pkgs; [ postgresql redis ];
+            buildInputs = with pkgs; [ postgresql redis pdm nodejs ];
+            # greenlet requires libstdc++
+            LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ];
         };
     };
 }
