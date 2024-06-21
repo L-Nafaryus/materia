@@ -35,7 +35,7 @@ readme = "README.md"
 license = {text = "MIT"}
 
 [tool.pdm.build]
-includes = ["src/materia_server", "src/materia_server/alembic.ini"]
+includes = ["src/materia_server"]
 
 [build-system]
 requires = ["pdm-backend"]

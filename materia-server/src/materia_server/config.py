@@ -106,6 +106,10 @@ class OAuth2(BaseModel):
     #def check(self) -> Self:
     #    if self.jwt_signing_algo in ["HS256", "HS384", "HS512"]:
     #        assert self.jwt_secret is not None, "JWT secret must be set for HS256, HS384, HS512 algorithms"
+    #    else:
+    #        assert self.jwt_signing_key is not None, "JWT signing key must be set"
+    #
+    #    return self
 
 
 class Mailer(BaseModel):
@@ -171,9 +175,6 @@ class Config(BaseSettings, env_prefix = "materia_", env_nested_delimiter = "_"):
         else:
             return cwd
 
-    @staticmethod 
-    def create(path: Path, config: Self | None = None):
-        config = config or Config()
-        pass
+        
 
 

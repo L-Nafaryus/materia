@@ -35,5 +35,5 @@ class FileLink(Base):
     file: Mapped["File"] = relationship(back_populates = "link")
 
 
-from materia_server.models.repository.repository import Repository
-from materia_server.models.directory.directory import Directory
+from materia_server.models.repository import Repository
+from materia_server.models.directory import Directory

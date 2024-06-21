@@ -19,8 +19,12 @@ import materia_server.models.file
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
+context.configure(
+        version_table_schema = "public"
+    )
 config = context.config
-config.set_main_option("sqlalchemy.url", Config().database.url())
+
+#config.set_main_option("sqlalchemy.url", Config().database.url())
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -59,6 +63,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table_schema = "public"
     )
 
     with context.begin_transaction():
@@ -99,4 +104,5 @@ def run_migrations_online() -> None:
 if context.is_offline_mode():
     run_migrations_offline()
 else:
+    print("online")
     run_migrations_online()

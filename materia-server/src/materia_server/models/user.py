@@ -80,9 +80,10 @@ class UserCredentials(BaseModel):
     password: str 
     email: Optional[EmailStr]
 
-class UserIdentity(BaseModel):
+class UserInfo(BaseModel):
     model_config = ConfigDict(from_attributes = True)
 
+    id: UUID
     name: str
     lower_name: str 
     full_name: Optional[str]
@@ -101,4 +102,4 @@ class UserIdentity(BaseModel):
 
     avatar: Optional[str]
 
-from materia_server.models.repository.repository import Repository
+from materia_server.models.repository import Repository

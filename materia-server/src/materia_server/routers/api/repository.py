@@ -1,60 +1,45 @@
-import os
-import time
-from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
-from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, insert, select, update
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from materia import db
-from materia.api import schema
-from materia.api.state import ConfigState, DatabaseState
-from materia.api.middleware import JwtMiddleware
-from materia.config import Config
+from materia_server.models import User, Repository, RepositoryInfo
+from materia_server.routers import middleware
+from materia_server.config import Config
 
 
 router = APIRouter(tags = ["repository"])
 
-@router.post("/repository", dependencies = [Depends(JwtMiddleware())])
-async def create(request: Request, config: ConfigState = Depends(), database: DatabaseState = Depends()):
-    user = request.state.user
-    repository_path = Config.data_dir() / "repository" / user.login_name.lower()
+@router.post("/repository")
+async def create(user: User = Depends(middleware.user), ctx: middleware.Context = Depends()):
+    repository_path = Config.data_dir() / "repository" / user.lower_name
 
-    async with database.session() as session:
+    if await Repository.by_user_id(user.id, ctx.database):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Repository already exists")
+
+    repository = Repository(
+        user_id = user.id,
+        capacity = ctx.config.repository.capacity
+    )
+    
+    try:
+        repository_path.mkdir(parents = True, exist_ok = True)
+    except OSError:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to created a repository")
+    
+    await repository.create(ctx.database)
+
+
+@router.get("/repository", response_model = RepositoryInfo)
+async def info(user: User = Depends(middleware.user), ctx: middleware.Context = Depends()):
+    async with ctx.database.session() as session:
         session.add(user)
         await session.refresh(user, attribute_names = ["repository"])
 
         if not (repository := user.repository):
-            repository = db.Repository(
-                owner_id = user.id,
-                capacity = config.repository.capacity
-            )
-            session.add(repository)
-
-            try:
-                repository_path.mkdir(parents = True, exist_ok = True)
-            except OSError:
-                raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to created a repository")
-            
-            await session.commit()
-
-        else:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Repository already exists")
-
-@router.get("/repository", dependencies = [Depends(JwtMiddleware())])
-async def info(request: Request, database: DatabaseState = Depends()):
-    user = request.state.user 
-
-    async with database.session() as session:
-        session.add(user)
-        await session.refresh(user, attribute_names = ["repository"])
-
-        if repository := user.repository:
-            await session.refresh(repository, attribute_names = ["files"])
-            
-            return schema.RepositoryInfo(
-                capacity = repository.capacity,
-                used = sum([ file.size for file in repository.files ])
-            )
-
-        else:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository is not found")
+
+        await session.refresh(repository, attribute_names = ["files"])
+        
+        return RepositoryInfo(
+            capacity = repository.capacity,
+            used = sum([ file.size for file in repository.files ])
+        )
+

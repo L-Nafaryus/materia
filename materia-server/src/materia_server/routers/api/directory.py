@@ -1,44 +1,40 @@
 import os
-import time
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
-from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, insert, select, update
 
-from materia import db
-from materia.api.state import ConfigState, DatabaseState
-from materia.api.middleware import JwtMiddleware
-from materia.config import Config
-from materia.api import schema
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from materia_server.models import User, Directory, DirectoryInfo
+from materia_server.models.directory import DirectoryInfo
+from materia_server.routers import middleware
+from materia_server.config import Config
 
 
 router = APIRouter(tags = ["directory"])
 
-@router.post("/directory", dependencies = [Depends(JwtMiddleware())])
-async def create(request: Request, path: Path = Path(), config: ConfigState = Depends(), database: DatabaseState = Depends()):
-    user = request.state.user
-    repository_path = Config.data_dir() / "repository" / user.login_name.lower()
+@router.post("/directory")
+async def create(path: Path = Path(), user: User = Depends(middleware.user), ctx: middleware.Context = Depends()):
+    repository_path = Config.data_dir() / "repository" / user.lower_name
     blacklist = [os.sep, ".", "..", "*"]
     directory_path = Path(os.sep.join(filter(lambda part: part not in blacklist, path.parts)))
 
-    async with database.session() as session:
+    async with ctx.database.session() as session:
         session.add(user)
         await session.refresh(user, attribute_names = ["repository"])
+
+        if not user.repository:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository is not found")
 
         current_directory = None
         current_path = Path()
         directory = None
 
         for part in directory_path.parts:
-            if not (directory := (await session
-                .scalars(select(db.Directory)
-                .where(and_(db.Directory.name == part, db.Directory.path == str(current_path))))
-            ).first()):
-                directory = db.Directory(
+            if not await Directory.by_path(user.repository.id, current_path, part, ctx.database):
+                directory = Directory(
                     repository_id = user.repository.id,
                     parent_id = current_directory.id if current_directory else None,
                     name = part,
-                    path = str(current_path)
+                    path = None if current_path == Path() else str(current_path)
                 )
                 session.add(directory)
 
@@ -52,23 +48,20 @@ async def create(request: Request, path: Path = Path(), config: ConfigState = De
 
         await session.commit()
 
-@router.get("/directory", dependencies = [Depends(JwtMiddleware())])
-async def info(request: Request, repository_id: int, path: Path, config: ConfigState = Depends(), database: DatabaseState = Depends()):
-    async with database.session() as session:
-        if directory := (await session
-            .scalars(select(db.Directory)
-            .where(and_(db.Directory.repository_id == repository_id, db.Directory.name == path.name, db.Directory.path == path.parent))
-        )).first():
-            await session.refresh(directory, attribute_names = ["files"])
-            return schema.DirectoryInfo(
-                id = directory.id,
-                created_at = directory.created_unix,
-                updated_at = directory.updated_unix,
-                name = directory.name,
-                path = directory.path,
-                is_public = directory.is_public,
-                used = sum([ file.size for file in directory.files ])
-            )
+@router.get("/directory")
+async def info(path: Path, user: User = Depends(middleware.user), ctx: middleware.Context = Depends()):
+    async with ctx.database.session() as session:
+        session.add(user)
+        await session.refresh(user, attribute_names = ["repository"])
 
-        else:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository is not found")
+        if not(directory := await Directory.by_path(user.repository.id, None if path.parent == Path() else path.parent, path.name, ctx.database)):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Directory is not found")
+
+        session.add(directory)
+        await session.refresh(directory, attribute_names = ["files"])
+
+        info = DirectoryInfo.model_validate(directory)
+        info.used = sum([ file.size for file in directory.files ])
+
+        return info
+

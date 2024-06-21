@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from materia_server import config as _config
 from materia_server.config import Config
 from materia_server._logging import make_logger, uvicorn_log_config, Logger
-from materia_server.models.database import Database, Cache
+from materia_server.models import Database, Cache
 from materia_server import routers
 
 
@@ -31,12 +31,19 @@ class AppContext(TypedDict):
 def create_lifespan(config: Config, logger):
     @asynccontextmanager 
     async def lifespan(app: FastAPI) -> AsyncIterator[AppContext]:
-        database = Database.new(config.database.url())  # type: ignore
+        
+        try:
+            logger.info("Connecting {}", config.database.url())
+            database = Database.new(config.database.url())  # type: ignore
+        except:
+            logger.error("Failed to connect postgres.")
+            sys.exit()
 
         try:
+            logger.info("Connecting {}", config.cache.url())
             cache = await Cache.new(config.cache.url()) # type: ignore
         except:
-            logger.error("Failed to connect redis {}", config.cache.url())
+            logger.error("Failed to connect redis.")
             sys.exit()
 
         async with database.connection() as connection:
@@ -64,6 +71,7 @@ def server():
 @from_pydantic("log", _config.Log, prefix = "log")
 def start(application: _config.Application, config_path: Path, log: _config.Log):
     config = Config()
+    config.log = log
     logger = make_logger(config)
 
     #if user := application.user:
@@ -71,8 +79,12 @@ def start(application: _config.Application, config_path: Path, log: _config.Log)
     #if group := application.group:
     #    os.setgid(pwd.getpwnam(user).pw_gid)
     # TODO: merge cli options with config
-    if working_directory := (application.working_directory or config.application.working_directory):
-        os.chdir(working_directory.resolve())
+    if working_directory := (application.working_directory or config.application.working_directory).resolve():
+        try:
+            os.chdir(working_directory)
+        except FileNotFoundError as e:
+            logger.error("Failed to change working directory: {}", e)
+            sys.exit()
     logger.debug(f"Current working directory: {working_directory}")
 
     # check the configuration file or use default
@@ -106,6 +118,13 @@ def start(application: _config.Application, config_path: Path, log: _config.Log)
     
     config.log.level = log.level
     logger = make_logger(config)
+    if (working_directory := config.application.working_directory.resolve()):
+        logger.debug(f"Change working directory: {working_directory}")
+        try:
+            os.chdir(working_directory)
+        except FileNotFoundError as e:
+            logger.error("Failed to change working directory: {}", e)
+            sys.exit()
 
     config.application.mode = application.mode
 

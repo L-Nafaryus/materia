@@ -7,9 +7,8 @@ from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from pydantic import BaseModel, HttpUrl
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
-from materia_server.models import auth
-from materia_server.models.user import user
-from materia_server.routers import context
+from materia_server.models import User
+from materia_server.routers.middleware import Context
 
 
 router = APIRouter(tags = ["oauth2"])
@@ -35,17 +34,17 @@ class AuthorizationCodeResponse(BaseModel):
     code: str
 
 @router.post("/oauth2/authorize")
-async def authorize(form: Annotated[OAuth2AuthorizationCodeRequestForm, Depends()], ctx: context.Context = Depends()):
+async def authorize(form: Annotated[OAuth2AuthorizationCodeRequestForm, Depends()], ctx: Context = Depends()):
     # grant_type: authorization_code, password_credentials, client_credentials, authorization_code (pkce)
     ctx.logger.debug(form)
 
     if form.grant_type == "authorization_code":
         # TODO: form validation 
 
-        if not (app := await auth.OAuth2Application.by_client_id(form.client_id, ctx.database)):
+        if not (app := await OAuth2Application.by_client_id(form.client_id, ctx.database)):
             raise HTTPException(status_code = HTTP_500_INTERNAL_SERVER_ERROR, detail = "Client ID not registered")
 
-        if not (owner := user.User.by_id(app.user_id, ctx.database)):
+        if not (owner := await User.by_id(app.user_id, ctx.database)):
             raise HTTPException(status_code = HTTP_500_INTERNAL_SERVER_ERROR, detail = "User not found")
 
         if not app.contains_redirect_uri(form.redirect_uri):
@@ -79,5 +78,5 @@ class AccessTokenResponse(BaseModel):
     scope: Optional[str]
 
 @router.post("/oauth2/access_token")
-async def token(ctx: context.Context = Depends()):
+async def token(ctx: Context = Depends()):
     pass

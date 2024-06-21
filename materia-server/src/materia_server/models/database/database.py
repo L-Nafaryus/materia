@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 from typing import AsyncIterator, Self
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from alembic.operations import Operations
 from alembic.runtime.migration import MigrationContext
 from alembic.script.base import ScriptDirectory
 
+from materia_server.config import Config
 from materia_server.models.base import Base
 
 __all__ = [ "Database" ]
@@ -61,14 +63,20 @@ class Database:
             await session.close()
 
     def run_migrations(self, connection: Connection):
-        config = AlembicConfig(Path(__file__).parent.parent.parent / "alembic.ini")
-        config.set_main_option("sqlalchemy.url", self.url) # type: ignore
+        #aconfig = AlembicConfig(Path(__file__).parent.parent.parent / "alembic.ini")
+        aconfig = AlembicConfig() 
+        aconfig.set_main_option("sqlalchemy.url", str(self.url))
+
+ 
+        aconfig.set_main_option("script_location", str(Path(__file__).parent.parent.joinpath("migrations")))
+        print(str(Path(__file__).parent.parent.joinpath("migrations")))
+
 
         context = MigrationContext.configure(
             connection = connection, # type: ignore
             opts = {
                 "target_metadata": Base.metadata,
-                "fn": lambda rev, _: ScriptDirectory.from_config(config)._upgrade_revs("head", rev)
+                "fn": lambda rev, _: ScriptDirectory.from_config(aconfig)._upgrade_revs("head", rev)
             }
         )
         
