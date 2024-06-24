@@ -19,9 +19,7 @@ import materia_server.models.file
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
-context.configure(
-        version_table_schema = "public"
-    )
+
 config = context.config
 
 #config.set_main_option("sqlalchemy.url", Config().database.url())

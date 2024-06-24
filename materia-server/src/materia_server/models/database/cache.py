@@ -4,6 +4,8 @@ from pydantic import BaseModel, RedisDsn
 from redis import asyncio as aioredis
 from redis.asyncio.client import Pipeline
 
+class CacheError(Exception):
+    pass 
 
 class Cache:
     def __init__(self, url: RedisDsn, pool: aioredis.ConnectionPool):
@@ -11,16 +13,22 @@ class Cache:
         self.pool: aioredis.ConnectionPool = pool
 
     @staticmethod
-    async def new(url: RedisDsn, encoding: str = "utf-8", decode_responses: bool = True) -> Self:
+    async def new(
+            url: RedisDsn, 
+            encoding: str = "utf-8", 
+            decode_responses: bool = True,
+            test_connection: bool = True
+        ) -> Self:
         pool = aioredis.ConnectionPool.from_url(str(url), encoding = encoding, decode_responses = decode_responses)
 
-        try:
-            connection = pool.make_connection()
-            await connection.connect()
-        except ConnectionError as e:
-            raise e 
-        else:
-            await connection.disconnect()
+        if test_connection:
+            try:
+                connection = pool.make_connection()
+                await connection.connect()
+            except ConnectionError as e:
+                raise CacheError(f"{e}") 
+            else:
+                await connection.disconnect()
 
         return Cache(
             url = url, 
@@ -32,7 +40,7 @@ class Cache:
         try:
             yield aioredis.Redis(connection_pool = self.pool)
         except Exception as e:
-            raise e
+            raise CacheError(f"{e}")
 
     @asynccontextmanager 
     async def pipeline(self, transaction: bool = True) -> AsyncGenerator[Pipeline, Any]:
@@ -41,5 +49,5 @@ class Cache:
         try:
             yield client.pipeline(transaction = transaction)
         except Exception as e:
-            raise e
+            raise CacheError(f"{e}")
     

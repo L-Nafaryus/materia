@@ -16,6 +16,12 @@ from materia_server.models.base import Base
 
 __all__ = [ "Database" ]
 
+class DatabaseError(Exception):
+    pass
+
+class DatabaseMigrationError(Exception):
+    pass
+
 class Database:
     def __init__(self, url: PostgresDsn, engine: AsyncEngine, sessionmaker: async_sessionmaker[AsyncSession]):
         self.url: PostgresDsn = url 
@@ -23,7 +29,14 @@ class Database:
         self.sessionmaker: async_sessionmaker[AsyncSession] = sessionmaker
 
     @staticmethod
-    def new(url: PostgresDsn, pool_size: int = 100, autocommit: bool = False, autoflush: bool = False, expire_on_commit: bool = False) -> Self:
+    async def new(
+            url: PostgresDsn, 
+            pool_size: int = 100, 
+            autocommit: bool = False, 
+            autoflush: bool = False, 
+            expire_on_commit: bool = False,
+            test_connection: bool = True
+        ) -> Self:
         engine = create_async_engine(str(url), pool_size = pool_size)
         sessionmaker = async_sessionmaker(
             bind = engine,
@@ -32,11 +45,20 @@ class Database:
             expire_on_commit = expire_on_commit
         )
 
-        return Database(
+        database = Database(
             url = url,
             engine = engine,
             sessionmaker = sessionmaker
         )
+
+        if test_connection:
+            try:
+                async with database.connection() as connection:
+                    await connection.rollback()
+            except Exception as e:
+                raise DatabaseError(f"{e}")
+
+        return database
 
     async def dispose(self):
         await self.engine.dispose()
@@ -48,7 +70,7 @@ class Database:
                 yield connection 
             except Exception as e:
                 await connection.rollback()
-                raise e 
+                raise DatabaseError(f"{e}") 
 
     @asynccontextmanager 
     async def session(self) -> AsyncIterator[AsyncSession]:
@@ -58,19 +80,14 @@ class Database:
             yield session 
         except Exception as e:
             await session.rollback()
-            raise e 
+            raise DatabaseError(f"{e}") 
         finally:
             await session.close()
 
-    def run_migrations(self, connection: Connection):
-        #aconfig = AlembicConfig(Path(__file__).parent.parent.parent / "alembic.ini")
+    def run_sync_migrations(self, connection: Connection):
         aconfig = AlembicConfig() 
         aconfig.set_main_option("sqlalchemy.url", str(self.url))
-
- 
         aconfig.set_main_option("script_location", str(Path(__file__).parent.parent.joinpath("migrations")))
-        print(str(Path(__file__).parent.parent.joinpath("migrations")))
-
 
         context = MigrationContext.configure(
             connection = connection, # type: ignore
@@ -79,9 +96,15 @@ class Database:
                 "fn": lambda rev, _: ScriptDirectory.from_config(aconfig)._upgrade_revs("head", rev)
             }
         )
-        
-        with context.begin_transaction():
-            with Operations.context(context):
-                context.run_migrations()
 
+        try:
+            with context.begin_transaction():
+                with Operations.context(context):
+                    context.run_migrations()
+        except Exception as e:
+            raise DatabaseMigrationError(f"{e}")
+
+    async def run_migrations(self):
+        async with self.connection() as connection:
+            await connection.run_sync(self.run_sync_migrations) # type: ignore
   

@@ -17,49 +17,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from materia_server import config as _config
 from materia_server.config import Config
 from materia_server._logging import make_logger, uvicorn_log_config, Logger
-from materia_server.models import Database, Cache
+from materia_server.models import Database, DatabaseError, Cache
 from materia_server import routers
-
-
-# TODO: add cache
-class AppContext(TypedDict):
-    config: Config
-    database: Database
-    cache: Cache
-    logger: Logger
-
-def create_lifespan(config: Config, logger):
-    @asynccontextmanager 
-    async def lifespan(app: FastAPI) -> AsyncIterator[AppContext]:
-        
-        try:
-            logger.info("Connecting {}", config.database.url())
-            database = Database.new(config.database.url())  # type: ignore
-        except:
-            logger.error("Failed to connect postgres.")
-            sys.exit()
-
-        try:
-            logger.info("Connecting {}", config.cache.url())
-            cache = await Cache.new(config.cache.url()) # type: ignore
-        except:
-            logger.error("Failed to connect redis.")
-            sys.exit()
-
-        async with database.connection() as connection:
-            await connection.run_sync(database.run_migrations) # type: ignore
-
-        yield AppContext(
-            config = config, 
-            database = database,
-            cache = cache,
-            logger = logger 
-        )
-
-        if database.engine is not None:
-            await database.dispose()
-
-    return lifespan
+from materia_server.app import make_application
 
 @click.group() 
 def server():
@@ -128,30 +88,13 @@ def start(application: _config.Application, config_path: Path, log: _config.Log)
 
     config.application.mode = application.mode
 
-
-
-    app = FastAPI(
-        title = "materia",
-        version = "0.1.0",
-        docs_url = "/api/docs",
-        lifespan = create_lifespan(config, logger)
-    )
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins = [ "http://localhost", "http://localhost:5173" ],
-        allow_credentials = True,
-        allow_methods = ["*"],
-        allow_headers = ["*"],
-    )
-    app.include_router(routers.api.router)
-
     try:
         uvicorn.run(
-            app,
+            make_application(config, logger),
             port = config.server.port, 
             host = str(config.server.address), 
             # reload = config.application.mode == "development",
-            log_config = uvicorn_log_config(config)
+            log_config = uvicorn_log_config(config),
         )
     except (KeyboardInterrupt, SystemExit):
         pass
