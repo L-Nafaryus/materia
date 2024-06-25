@@ -9,4 +9,4 @@ from materia_server.models.repository import Repository, RepositoryInfo
 
 from materia_server.models.directory import Directory, DirectoryLink, DirectoryInfo
 
-from materia_server.models.file import File, FileLink
+from materia_server.models.file import File, FileLink, FileInfo

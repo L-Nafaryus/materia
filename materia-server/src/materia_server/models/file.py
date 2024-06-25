@@ -1,10 +1,14 @@
 from time import time
+from typing import Optional, Self
+from pathlib import Path
 
 from sqlalchemy import BigInteger, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
+import sqlalchemy as sa
+from pydantic import BaseModel, ConfigDict
 
 from materia_server.models.base import Base
-
+from materia_server.models import database
 
 class File(Base):
     __tablename__ = "file"
@@ -23,6 +27,14 @@ class File(Base):
     parent: Mapped["Directory"] = relationship(back_populates = "files")
     link: Mapped["FileLink"] = relationship(back_populates = "file")
 
+    @staticmethod
+    async def by_path(repository_id: int, path: Path | None, name: str, db: database.Database) -> Self | None:
+        async with db.session() as session:
+            query_path = File.path == str(path) if isinstance(path, Path) else File.path.is_(None) 
+            return (await session
+                .scalars(sa.select(File)
+                .where(sa.and_(File.repository_id == repository_id, File.name == name, query_path)))
+            ).first()
 
 class FileLink(Base):
     __tablename__ = "file_link"
@@ -33,6 +45,19 @@ class FileLink(Base):
     url: Mapped[str]
 
     file: Mapped["File"] = relationship(back_populates = "link")
+
+class FileInfo(BaseModel):
+    model_config = ConfigDict(from_attributes = True)
+
+    id: int 
+    repository_id: int
+    parent_id: Optional[int]
+    created: int 
+    updated: int 
+    name: str 
+    path: Optional[str] 
+    is_public: bool
+    size: int
 
 
 from materia_server.models.repository import Repository

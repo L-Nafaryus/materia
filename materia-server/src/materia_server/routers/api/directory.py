@@ -4,7 +4,6 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from materia_server.models import User, Directory, DirectoryInfo
-from materia_server.models.directory import DirectoryInfo
 from materia_server.routers import middleware
 from materia_server.config import Config
 
@@ -53,6 +52,9 @@ async def info(path: Path, user: User = Depends(middleware.user), ctx: middlewar
     async with ctx.database.session() as session:
         session.add(user)
         await session.refresh(user, attribute_names = ["repository"])
+
+        if not user.repository:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository is not found")
 
         if not(directory := await Directory.by_path(user.repository.id, None if path.parent == Path() else path.parent, path.name, ctx.database)):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Directory is not found")
