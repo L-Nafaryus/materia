@@ -36,6 +36,11 @@ class File(Base):
                 .where(sa.and_(File.repository_id == repository_id, File.name == name, query_path)))
             ).first()
 
+    async def remove(self, db: database.Database):
+        async with db.session() as session:
+            await session.execute(sa.delete(File).where(File.id == self.id))
+            await session.commit()
+
 class FileLink(Base):
     __tablename__ = "file_link"
 

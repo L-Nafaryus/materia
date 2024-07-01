@@ -68,11 +68,35 @@ async def info(path: Path, user: User = Depends(middleware.user), ctx: middlewar
         await session.refresh(user, attribute_names = ["repository"])
 
     if not user.repository:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository is not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
 
     if not(file := await File.by_path(user.repository.id, None if path.parent == Path() else path.parent, path.name, ctx.database)):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "File is not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
 
     info = FileInfo.model_validate(file)
 
     return info
+
+@router.delete("/file")
+async def remove(path: Path, user: User = Depends(middleware.user), ctx: middleware.Context = Depends()):
+    async with ctx.database.session() as session:
+        session.add(user)
+        await session.refresh(user, attribute_names = ["repository"])
+
+    if not user.repository:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
+
+    if not(file := await File.by_path(user.repository.id, None if path.parent == Path() else path.parent, path.name, ctx.database)):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
+
+    repository_path = Config.data_dir() / "repository" / user.lower_name
+
+    try:
+        file_path = repository_path.joinpath(path)
+
+        if file_path.exists():
+            file_path.unlink(missing_ok = True)
+    except OSError:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to remove a file")
+
+    await file.remove(ctx.database)
