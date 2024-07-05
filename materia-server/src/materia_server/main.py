@@ -1,5 +1,5 @@
 from contextlib import _AsyncGeneratorContextManager, asynccontextmanager
-from os import environ 
+from os import environ
 import os
 from pathlib import Path
 import pwd
@@ -21,25 +21,29 @@ from materia_server.models import Database, DatabaseError, Cache
 from materia_server import routers
 from materia_server.app import make_application
 
-@click.group() 
+
+@click.group()
 def server():
-    pass 
+    pass
+
 
 @server.command()
-@click.option("--config_path", type = Path)
-@from_pydantic("application", _config.Application, prefix = "app")
-@from_pydantic("log", _config.Log, prefix = "log")
+@click.option("--config_path", type=Path)
+@from_pydantic("application", _config.Application, prefix="app")
+@from_pydantic("log", _config.Log, prefix="log")
 def start(application: _config.Application, config_path: Path, log: _config.Log):
     config = Config()
     config.log = log
     logger = make_logger(config)
 
-    #if user := application.user:
+    # if user := application.user:
     #    os.setuid(pwd.getpwnam(user).pw_uid)
-    #if group := application.group:
+    # if group := application.group:
     #    os.setgid(pwd.getpwnam(user).pw_gid)
     # TODO: merge cli options with config
-    if working_directory := (application.working_directory or config.application.working_directory).resolve():
+    if working_directory := (
+        application.working_directory or config.application.working_directory
+    ).resolve():
         try:
             os.chdir(working_directory)
         except FileNotFoundError as e:
@@ -75,10 +79,10 @@ def start(application: _config.Application, config_path: Path, log: _config.Log)
         else:
             logger.info("Using the default configuration.")
             config = Config()
-    
+
     config.log.level = log.level
     logger = make_logger(config)
-    if (working_directory := config.application.working_directory.resolve()):
+    if working_directory := config.application.working_directory.resolve():
         logger.debug(f"Change working directory: {working_directory}")
         try:
             os.chdir(working_directory)
@@ -91,21 +95,31 @@ def start(application: _config.Application, config_path: Path, log: _config.Log)
     try:
         uvicorn.run(
             make_application(config, logger),
-            port = config.server.port, 
-            host = str(config.server.address), 
+            port=config.server.port,
+            host=str(config.server.address),
             # reload = config.application.mode == "development",
-            log_config = uvicorn_log_config(config),
+            log_config=uvicorn_log_config(config),
         )
     except (KeyboardInterrupt, SystemExit):
         pass
 
+
 @server.group()
 def config():
-    pass 
+    pass
 
-@config.command("create", help = "Create a new configuration file.")
-@click.option("--path", "-p", type = Path, default = Path.cwd().joinpath("config.toml"), help = "Path to the file.")
-@click.option("--force", "-f", is_flag = True, default = False, help = "Overwrite a file if exists.")
+
+@config.command("create", help="Create a new configuration file.")
+@click.option(
+    "--path",
+    "-p",
+    type=Path,
+    default=Path.cwd().joinpath("config.toml"),
+    help="Path to the file.",
+)
+@click.option(
+    "--force", "-f", is_flag=True, default=False, help="Overwrite a file if exists."
+)
 def config_create(path: Path, force: bool):
     path = path.resolve()
     config = Config()
@@ -117,14 +131,21 @@ def config_create(path: Path, force: bool):
 
     if not path.parent.exists():
         logger.info("Creating directory at {}", path)
-        path.mkdir(parents = True)
+        path.mkdir(parents=True)
 
     logger.info("Writing configuration file at {}", path)
     config.write(path)
     logger.info("All done.")
 
-@config.command("check", help = "Check the configuration file.")
-@click.option("--path", "-p", type = Path, default = Path.cwd().joinpath("config.toml"), help = "Path to the file.")
+
+@config.command("check", help="Check the configuration file.")
+@click.option(
+    "--path",
+    "-p",
+    type=Path,
+    default=Path.cwd().joinpath("config.toml"),
+    help="Path to the file.",
+)
 def config_check(path: Path):
     path = path.resolve()
     config = Config()
@@ -141,9 +162,6 @@ def config_check(path: Path):
     else:
         logger.info("OK.")
 
+
 if __name__ == "__main__":
     server()
-    
-
-
-

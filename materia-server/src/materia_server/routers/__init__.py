@@ -1,1 +1,1 @@
-from materia_server.routers import middleware, api
+from materia_server.routers import middleware, api, resources

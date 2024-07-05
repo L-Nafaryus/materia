@@ -1,5 +1,5 @@
 from contextlib import _AsyncGeneratorContextManager, asynccontextmanager
-from os import environ 
+from os import environ
 import os
 from pathlib import Path
 import pwd
@@ -17,7 +17,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from materia_server import config as _config
 from materia_server.config import Config
 from materia_server._logging import make_logger, uvicorn_log_config, Logger
-from materia_server.models import Database, DatabaseError, DatabaseMigrationError, Cache, CacheError
+from materia_server.models import (
+    Database,
+    DatabaseError,
+    DatabaseMigrationError,
+    Cache,
+    CacheError,
+)
 from materia_server import routers
 
 
@@ -27,10 +33,11 @@ class AppContext(TypedDict):
     database: Database
     cache: Cache
 
+
 def make_lifespan(config: Config, logger: Logger):
-    @asynccontextmanager 
+    @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[AppContext]:
-        
+
         try:
             logger.info("Connecting to database {}", config.database.url())
             database = await Database.new(config.database.url())  # type: ignore
@@ -39,7 +46,7 @@ def make_lifespan(config: Config, logger: Logger):
             await database.run_migrations()
 
             logger.info("Connecting to cache {}", config.cache.url())
-            cache = await Cache.new(config.cache.url()) # type: ignore
+            cache = await Cache.new(config.cache.url())  # type: ignore
         except DatabaseError as e:
             logger.error(f"Failed to connect postgres: {e}")
             sys.exit()
@@ -50,32 +57,29 @@ def make_lifespan(config: Config, logger: Logger):
             logger.error(f"Failed to connect redis: {e}")
             sys.exit()
 
-        yield AppContext(
-            config = config, 
-            database = database,
-            cache = cache,
-            logger = logger 
-        )
+        yield AppContext(config=config, database=database, cache=cache, logger=logger)
 
         if database.engine is not None:
             await database.dispose()
 
     return lifespan
 
+
 def make_application(config: Config, logger: Logger):
     app = FastAPI(
-        title = "materia",
-        version = "0.1.0",
-        docs_url = "/api/docs",
-        lifespan = make_lifespan(config, logger)
+        title="materia",
+        version="0.1.0",
+        docs_url="/api/docs",
+        lifespan=make_lifespan(config, logger),
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins = [ "http://localhost", "http://localhost:5173" ],
-        allow_credentials = True,
-        allow_methods = ["*"],
-        allow_headers = ["*"],
+        allow_origins=["http://localhost", "http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     app.include_router(routers.api.router)
+    app.include_router(routers.resources.router)
 
     return app
