@@ -30,18 +30,10 @@ export function handle_error(error: AxiosError): Promise<ResponseError> {
 
 const debug = import.meta.hot;
 
-export const client: AxiosInstance = axios.create({
+export const api_client: AxiosInstance = axios.create({
     baseURL: debug ? "http://localhost:54601/api" : "/api",
     headers: {
         "Content-Type": "application/json"
-    },
-    withCredentials: true,
-});
-
-export const upload_client: AxiosInstance = axios.create({
-    baseURL: debug ? "http://localhost:54601/api" : "/api",
-    headers: {
-        "Content-Type": "multipart/form-data"
     },
     withCredentials: true,
 });
@@ -51,4 +43,3 @@ export const resources_client: AxiosInstance = axios.create({
     responseType: "blob"
 });
 
-export default client;

@@ -18,7 +18,7 @@ async function signup() {
         return;
     }
     await api.auth.signup({ name: login.value, password: password.value, email: email.value })
-        .then(async user => { router.push({ path: "/user/login" }); })
+        .then(async user => { router.push({ path: "/auth/signin" }); })
         .catch(err => { error.value = err.message; });
 };
 </script>

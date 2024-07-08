@@ -1,18 +1,16 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import { user } from "@/api";
 import { useUserStore } from "@/stores";
-
+import { api, resources } from "@";
 
 async function check_authorized(): Promise<boolean> {
     const userStore = useUserStore();
 
-    // TODO: add timer
-    return await user.current()
-        .then(async user => { userStore.current = user; })
+    return await api.user.info()
+        .then(async user_info => { userStore.info = user_info; })
         .then(async () => {
-            if (userStore.current.avatar?.length) {
-                await user.get_avatar(userStore.current.avatar)
+            if (!userStore.avatar && userStore.info.avatar) {
+                await resources.avatars(userStore.info.avatar)
                     .then(async avatar => { userStore.avatar = avatar; })
             }
         })
@@ -69,8 +67,8 @@ const router = createRouter({
             ]
         },
         {
-            path: "/:user", name: "profile", beforeEnter: [bypass_auth],
-            component: () => import("@/views/user/Profile.vue")
+            path: "/:user/repository", name: "repository", beforeEnter: [required_auth],
+            component: () => import("@/views/Repository.vue")
         },
         {
             path: "/admin/settings", name: "settings", beforeEnter: [required_auth, required_admin],

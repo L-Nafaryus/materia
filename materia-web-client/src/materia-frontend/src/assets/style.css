@@ -22,11 +22,15 @@
     }
 
     .button {
-        @apply pt-2 pb-2 pl-5 pr-5 rounded bg-ctp-mantle hover:bg-ctp-base text-ctp-blue;
+        @apply pt-2 pb-2 pl-5 pr-5 rounded bg-ctp-mantle hover:bg-ctp-base text-ctp-blue cursor-pointer;
     }
 
     .link-button {
-        @apply button text-ctp-green;
+        @apply button text-ctp-green cursor-pointer;
+    }
+
+    .hline {
+        @apply border-t border-ctp-overlay0 ml-0 mr-0;
     }
 
     h1 {

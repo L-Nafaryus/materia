@@ -2,17 +2,18 @@ import { defineStore } from "pinia";
 import { ref, type Ref } from "vue";
 
 import { user } from "@/api";
+import { resources } from "@";
 
 export const useUserStore = defineStore("user", () => {
-    const current: Ref<user.User | null> = ref(null);
-    const avatar: Ref<Blob | null> = ref(null);
+    const info: Ref<user.UserInfo | null> = ref(null);
+    const avatar: Ref<resources.Image | null> = ref(null);
 
     function clear() {
-        current.value = null;
+        info.value = null;
         avatar.value = null;
     }
 
-    return { current, avatar, clear };
+    return { info, avatar, clear };
 });
 
 export const useMiscStore = defineStore("misc", () => {

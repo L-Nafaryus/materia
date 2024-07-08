@@ -40,7 +40,7 @@ async function signin() {
 
     await api.auth.signin(body)
         .then(async () => {
-            //userStore.current = user;
+            //userStore.info = user_info;
             router.push({ path: "/" });
         })
         .catch(err => { error.value = err.message; });
@@ -62,7 +62,7 @@ async function signin() {
             </div>
             <div class="mb-5 flex justify-between items-center">
                 <button @click="signin" class="button">Sign In</button>
-                <button @click="$router.push('/user/register')" class="button">Sign Up</button>
+                <button @click="$router.push('/auth/signup')" class="button">Sign Up</button>
             </div>
         </form>
         <Error v-if="error">{{ error }}</Error>
