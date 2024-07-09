@@ -1,7 +1,15 @@
 import shutil
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from materia_server.models import User, Repository, RepositoryInfo
+from materia_server.models import (
+    User,
+    Repository,
+    RepositoryInfo,
+    RepositoryContent,
+    FileInfo,
+    DirectoryInfo,
+)
 from materia_server.routers import middleware
 from materia_server.config import Config
 
@@ -32,35 +40,24 @@ async def create(
 
 @router.get("/repository", response_model=RepositoryInfo)
 async def info(
-    user: User = Depends(middleware.user), ctx: middleware.Context = Depends()
+    repository=Depends(middleware.repository), ctx: middleware.Context = Depends()
 ):
-    async with ctx.database.session() as session:
-        session.add(user)
-        await session.refresh(user, attribute_names=["repository"])
-
-    if not (repository := user.repository):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
-
     async with ctx.database.session() as session:
         session.add(repository)
         await session.refresh(repository, attribute_names=["files"])
 
-    return RepositoryInfo(
-        capacity=repository.capacity,
-        used=sum([file.size for file in repository.files]),
-    )
+    info = RepositoryInfo.model_validate(repository)
+    info.used = sum([file.size for file in repository.files])
+
+    return info
 
 
 @router.delete("/repository")
 async def remove(
-    user: User = Depends(middleware.user), ctx: middleware.Context = Depends()
+    repository=Depends(middleware.repository),
+    repository_path=Depends(middleware.repository_path),
+    ctx: middleware.Context = Depends(),
 ):
-    repository_path = Config.data_dir() / "repository" / user.lower_name
-
-    async with ctx.database.session() as session:
-        session.add(user)
-        await session.refresh(user, attribute_names=["repository"])
-
     try:
         if repository_path.exists():
             shutil.rmtree(str(repository_path))
@@ -69,4 +66,33 @@ async def remove(
             status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to remove repository"
         )
 
-    await user.repository.remove(ctx.database)
+    await repository.remove(ctx.database)
+
+
+@router.get("/repository/content", response_model=RepositoryContent)
+async def content(
+    repository=Depends(middleware.repository), ctx: middleware.Context = Depends()
+):
+    async with ctx.database.session() as session:
+        session.add(repository)
+        await session.refresh(repository, attribute_names=["directories"])
+        await session.refresh(repository, attribute_names=["files"])
+
+    content = RepositoryContent(
+        files=list(
+            map(
+                lambda file: FileInfo.model_validate(file),
+                filter(lambda file: file.path is None, repository.files),
+            )
+        ),
+        directories=list(
+            map(
+                lambda directory: DirectoryInfo.model_validate(directory),
+                filter(
+                    lambda directory: directory.path is None, repository.directories
+                ),
+            )
+        ),
+    )
+
+    return content

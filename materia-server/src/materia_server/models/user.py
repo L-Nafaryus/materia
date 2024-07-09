@@ -82,7 +82,7 @@ class User(Base):
 
     async def remove(self, db: database.Database):
         async with db.session() as session:
-            await session.execute(sa.delete(User).where(User.id == self.id))
+            await session.delete(self)
             await session.commit()
 
 

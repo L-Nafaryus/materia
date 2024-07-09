@@ -59,7 +59,7 @@ class Directory(Base):
 
     async def remove(self, db: database.Database):
         async with db.session() as session:
-            await session.execute(sa.delete(Directory).where(Directory.id == self.id))
+            await session.delete(self)
             await session.commit()
 
 

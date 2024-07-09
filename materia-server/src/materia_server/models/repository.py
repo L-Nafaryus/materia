@@ -1,12 +1,12 @@
 from time import time
-from typing import List, Self
+from typing import List, Self, Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import BigInteger, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 import sqlalchemy as sa
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from materia_server.models.base import Base
 from materia_server.models import database
@@ -55,15 +55,24 @@ class Repository(Base):
 
     async def remove(self, db: database.Database):
         async with db.session() as session:
-            await session.execute(sa.delete(Repository).where(Repository.id == self.id))
+            await session.delete(self)
             await session.commit()
 
 
 class RepositoryInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
     capacity: int
-    used: int
+    used: Optional[int] = None
+
+
+class RepositoryContent(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    files: list["FileInfo"]
+    directories: list["DirectoryInfo"]
 
 
 from materia_server.models.user import User
-from materia_server.models.directory import Directory
-from materia_server.models.file import File
+from materia_server.models.directory import Directory, DirectoryInfo
+from materia_server.models.file import File, FileInfo

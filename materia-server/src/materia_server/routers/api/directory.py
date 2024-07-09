@@ -28,36 +28,39 @@ async def create(
         session.add(user)
         await session.refresh(user, attribute_names=["repository"])
 
-        if not user.repository:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
+    if not user.repository:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
 
-        current_directory = None
-        current_path = Path()
-        directory = None
+    current_directory = None
+    current_path = Path()
+    directory = None
 
-        for part in directory_path.parts:
-            if not await Directory.by_path(
-                user.repository.id, current_path, part, ctx.database
-            ):
-                directory = Directory(
-                    repository_id=user.repository.id,
-                    parent_id=current_directory.id if current_directory else None,
-                    name=part,
-                    path=None if current_path == Path() else str(current_path),
-                )
-                session.add(directory)
-
-            current_directory = directory
-            current_path /= part
-
-        try:
-            (repository_path / directory_path).mkdir(parents=True, exist_ok=True)
-        except OSError:
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to created a directory"
+    for part in directory_path.parts:
+        if not await Directory.by_path(
+            user.repository.id, current_path, part, ctx.database
+        ):
+            directory = Directory(
+                repository_id=user.repository.id,
+                parent_id=current_directory.id if current_directory else None,
+                name=part,
+                path=None if current_path == Path() else str(current_path),
             )
 
-        await session.commit()
+            try:
+                (repository_path / current_path / part).mkdir(exist_ok=True)
+            except OSError:
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    f"Failed to create a directory {current_path / part}",
+                )
+
+            async with ctx.database.session() as session:
+                session.add(directory)
+                await session.commit()
+                await session.refresh(directory)
+
+        current_directory = directory
+        current_path /= part
 
 
 @router.get("/directory")
