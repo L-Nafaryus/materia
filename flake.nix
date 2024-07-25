@@ -19,8 +19,7 @@
   }: let
     system = "x86_64-linux";
     pkgs = import nixpkgs {inherit system;};
-    bonpkgs = bonfire.packages.${system};
-    bonlib = bonfire.lib;
+    bonLib = bonfire.lib;
 
     dreamBuildPackage = {
       module,
@@ -77,7 +76,7 @@
         meta = with nixpkgs.lib; {
           description = "Materia frontend";
           license = licenses.mit;
-          maintainers = with bonlib.maintainers; [L-Nafaryus];
+          maintainers = with bonLib.maintainers; [L-Nafaryus];
           broken = false;
         };
       };
@@ -115,7 +114,7 @@
         meta = with nixpkgs.lib; {
           description = "Materia web client";
           license = licenses.mit;
-          maintainers = with bonlib.maintainers; [L-Nafaryus];
+          maintainers = with bonLib.maintainers; [L-Nafaryus];
           broken = false;
         };
       };
@@ -150,96 +149,15 @@
         meta = with nixpkgs.lib; {
           description = "Materia";
           license = licenses.mit;
-          maintainers = with bonlib.maintainers; [L-Nafaryus];
+          maintainers = with bonLib.maintainers; [L-Nafaryus];
           broken = false;
           mainProgram = "materia-server";
         };
       };
 
-      postgresql = let
-        user = "postgres";
-        database = "postgres";
-        dataDir = "/var/lib/postgresql";
-        entryPoint = pkgs.writeTextDir "entrypoint.sh" ''
-          initdb -U ${user}
-          postgres -k ${dataDir}
-        '';
-      in
-        pkgs.dockerTools.buildImage {
-          name = "postgresql";
-          tag = "devel";
+      postgresql-devel = bonfire.packages.x86_64-linux.postgresql;
 
-          copyToRoot = pkgs.buildEnv {
-            name = "image-root";
-            pathsToLink = ["/bin" "/etc" "/"];
-            paths = with pkgs; [
-              bash
-              postgresql
-              entryPoint
-            ];
-          };
-          runAsRoot = with pkgs; ''
-            #!${runtimeShell}
-            ${dockerTools.shadowSetup}
-            groupadd -r ${user}
-            useradd -r -g ${user} --home-dir=${dataDir} ${user}
-            mkdir -p ${dataDir}
-            chown -R ${user}:${user} ${dataDir}
-          '';
-
-          config = {
-            Entrypoint = ["bash" "/entrypoint.sh"];
-            StopSignal = "SIGINT";
-            User = "${user}:${user}";
-            Env = ["PGDATA=${dataDir}"];
-            WorkingDir = dataDir;
-            ExposedPorts = {
-              "5432/tcp" = {};
-            };
-          };
-        };
-
-      redis = let
-        user = "redis";
-        dataDir = "/var/lib/redis";
-        entryPoint = pkgs.writeTextDir "entrypoint.sh" ''
-          redis-server \
-              --daemonize no \
-              --dir "${dataDir}"
-        '';
-      in
-        pkgs.dockerTools.buildImage {
-          name = "redis";
-          tag = "devel";
-
-          copyToRoot = pkgs.buildEnv {
-            name = "image-root";
-            pathsToLink = ["/bin" "/etc" "/"];
-            paths = with pkgs; [
-              bash
-              redis
-              entryPoint
-            ];
-          };
-          runAsRoot = with pkgs; ''
-            #!${runtimeShell}
-            ${dockerTools.shadowSetup}
-            groupadd -r ${user}
-            useradd -r -g ${user} --home-dir=${dataDir} ${user}
-            mkdir -p ${dataDir}
-            chown -R ${user}:${user} ${dataDir}
-          '';
-
-          config = {
-            Entrypoint = ["bash" "/entrypoint.sh"];
-            StopSignal = "SIGINT";
-            User = "${user}:${user}";
-            WorkingDir = dataDir;
-            ExposedPorts = {
-              "6379/tcp" = {};
-            };
-          };
-        };
+      redis-devel = bonfire.packages.x86_64-linux.redis;
     };
 
     apps.x86_64-linux = {

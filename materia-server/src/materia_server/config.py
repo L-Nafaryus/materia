@@ -1,12 +1,20 @@
 from os import environ
-from pathlib import Path 
+from pathlib import Path
 import sys
 from typing import Any, Literal, Optional, Self, Union
 
-from pydantic import BaseModel, Field, HttpUrl, model_validator, TypeAdapter, PostgresDsn, NameEmail
+from pydantic import (
+    BaseModel,
+    Field,
+    HttpUrl,
+    model_validator,
+    TypeAdapter,
+    PostgresDsn,
+    NameEmail,
+)
 from pydantic_settings import BaseSettings
 from pydantic.networks import IPvAnyAddress
-import toml 
+import toml
 
 
 class Application(BaseModel):
@@ -15,53 +23,61 @@ class Application(BaseModel):
     mode: Literal["production", "development"] = "production"
     working_directory: Optional[Path] = Path.cwd()
 
+
 class Log(BaseModel):
     mode: Literal["console", "file", "all"] = "console"
     level: Literal["info", "warning", "error", "critical", "debug", "trace"] = "info"
-    console_format: str = "<level>{level: <8}</level> <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}" 
-    file_format: str = "<level>{level: <8}</level>: <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}" 
+    console_format: str = (
+        "<level>{level: <8}</level> <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}"
+    )
+    file_format: str = (
+        "<level>{level: <8}</level>: <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}"
+    )
     file: Optional[Path] = None
     file_rotation: str = "3 days"
     file_retention: str = "1 week"
 
+
 class Server(BaseModel):
     scheme: Literal["http", "https"] = "http"
-    address: IPvAnyAddress = Field(default = "127.0.0.1")
+    address: IPvAnyAddress = Field(default="127.0.0.1")
     port: int = 54601
     domain: str = "localhost"
+
 
 class Database(BaseModel):
     backend: Literal["postgresql"] = "postgresql"
     scheme: Literal["postgresql+asyncpg"] = "postgresql+asyncpg"
-    address: IPvAnyAddress = Field(default = "127.0.0.1")
+    address: IPvAnyAddress = Field(default="127.0.0.1")
     port: int = 5432
-    name: str = "materia"
+    name: Optional[str] = "materia"
     user: str = "materia"
     password: Optional[Union[str, Path]] = None
     # ssl: bool = False
 
     def url(self) -> str:
         if self.backend in ["postgresql"]:
-            return "{}://{}:{}@{}:{}/{}".format(
-                self.scheme,
-                self.user,
-                self.password,
-                self.address,
-                self.port,
-                self.name
+            return (
+                "{}://{}:{}@{}:{}".format(
+                    self.scheme, self.user, self.password, self.address, self.port
+                )
+                + f"/{self.name}"
+                if self.name
+                else ""
             )
         else:
-            raise NotImplemented()
+            raise NotImplementedError()
+
 
 class Cache(BaseModel):
-    backend: Literal["redis"] = "redis" # add: memory
+    backend: Literal["redis"] = "redis"  # add: memory
     # gc_interval: Optional[int] = 60   # for: memory
     scheme: Literal["redis", "rediss"] = "redis"
-    address: Optional[IPvAnyAddress] = Field(default = "127.0.0.1")
+    address: Optional[IPvAnyAddress] = Field(default="127.0.0.1")
     port: Optional[int] = 6379
-    user: Optional[str] = None 
-    password: Optional[Union[str, Path]] = None 
-    database: Optional[int] = 0 # for: redis
+    user: Optional[str] = None
+    password: Optional[Union[str, Path]] = None
+    database: Optional[int] = 0  # for: redis
 
     def url(self) -> str:
         if self.backend in ["redis"]:
@@ -72,38 +88,39 @@ class Cache(BaseModel):
                     self.password,
                     self.address,
                     self.port,
-                    self.database
+                    self.database,
                 )
             else:
                 return "{}://{}:{}/{}".format(
-                    self.scheme,
-                    self.address,
-                    self.port,
-                    self.database
+                    self.scheme, self.address, self.port, self.database
                 )
         else:
             raise NotImplemented()
 
+
 class Security(BaseModel):
     secret_key: Optional[Union[str, Path]] = None
     password_min_length: int = 8
-    password_hash_algo: Literal["bcrypt"] = "bcrypt" 
+    password_hash_algo: Literal["bcrypt"] = "bcrypt"
     cookie_http_only: bool = True
     cookie_access_token_name: str = "materia_at"
     cookie_refresh_token_name: str = "materia_rt"
 
+
 class OAuth2(BaseModel):
-    enabled: bool = True 
-    jwt_signing_algo: Literal["HS256"] = "HS256"    
+    enabled: bool = True
+    jwt_signing_algo: Literal["HS256"] = "HS256"
     # check if signing algo need a key or generate it | HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512, EdDSA
     jwt_signing_key: Optional[Union[str, Path]] = None
-    jwt_secret: Optional[Union[str, Path]] = None  # only for HS256, HS384, HS512 | generate
-    access_token_lifetime: int = 3600 
+    jwt_secret: Optional[Union[str, Path]] = (
+        None  # only for HS256, HS384, HS512 | generate
+    )
+    access_token_lifetime: int = 3600
     refresh_token_lifetime: int = 730 * 60
-    refresh_token_validation: bool = False 
+    refresh_token_validation: bool = False
 
-    #@model_validator(mode = "after")
-    #def check(self) -> Self:
+    # @model_validator(mode = "after")
+    # def check(self) -> Self:
     #    if self.jwt_signing_algo in ["HS256", "HS384", "HS512"]:
     #        assert self.jwt_secret is not None, "JWT secret must be set for HS256, HS384, HS512 algorithms"
     #    else:
@@ -113,12 +130,12 @@ class OAuth2(BaseModel):
 
 
 class Mailer(BaseModel):
-    enabled: bool = False 
+    enabled: bool = False
     scheme: Optional[Literal["smtp", "smtps", "smtp+starttls"]] = None
     address: Optional[IPvAnyAddress] = None
     port: Optional[int] = None
-    helo: bool = True 
-    
+    helo: bool = True
+
     cert_file: Optional[Path] = None
     key_file: Optional[Path] = None
 
@@ -127,22 +144,25 @@ class Mailer(BaseModel):
     password: Optional[str] = None
     plain_text: bool = False
 
+
 class Cron(BaseModel):
     pass
+
 
 class Repository(BaseModel):
     capacity: int = 41943040
 
-class Config(BaseSettings, env_prefix = "materia_", env_nested_delimiter = "_"):
+
+class Config(BaseSettings, env_prefix="materia_", env_nested_delimiter="_"):
     application: Application = Application()
-    log: Log = Log() 
+    log: Log = Log()
     server: Server = Server()
     database: Database = Database()
-    cache: Cache = Cache() 
+    cache: Cache = Cache()
     security: Security = Security()
     oauth2: OAuth2 = OAuth2()
     mailer: Mailer = Mailer()
-    cron: Cron = Cron() 
+    cron: Cron = Cron()
     repository: Repository = Repository()
 
     @staticmethod
@@ -151,7 +171,7 @@ class Config(BaseSettings, env_prefix = "materia_", env_nested_delimiter = "_"):
             data: dict = toml.load(path)
         except Exception as e:
             raise e
-            #return None
+            # return None
         else:
             return Config(**data)
 
@@ -163,7 +183,7 @@ class Config(BaseSettings, env_prefix = "materia_", env_nested_delimiter = "_"):
             for key_second in dump[key_first].keys():
                 if isinstance(dump[key_first][key_second], Path):
                     dump[key_first][key_second] = str(dump[key_first][key_second])
-            
+
         with open(path, "w") as file:
             toml.dump(dump, file)
 
@@ -174,7 +194,3 @@ class Config(BaseSettings, env_prefix = "materia_", env_nested_delimiter = "_"):
             return cwd / "temp"
         else:
             return cwd
-
-        
-
-

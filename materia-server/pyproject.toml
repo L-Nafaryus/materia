@@ -36,22 +36,12 @@ requires-python = "<3.12,>=3.10"
 readme = "README.md"
 license = {text = "MIT"}
 
-[tool.pdm.build]
-includes = ["src/materia_server"]
-
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
 [project.scripts]
 materia-server = "materia_server.main:server"
-
-[tool.pdm.scripts]
-start-server.cmd = "python ./src/materia_server/main.py {args:start --app-mode development --log-level debug}"
-db-upgrade.cmd = "alembic -c ./src/materia_server/alembic.ini upgrade {args:head}"
-db-downgrade.shell = "alembic -c ./src/materia_server/alembic.ini downgrade {args:base}"
-db-revision.cmd = "alembic revision {args:--autogenerate}"
-remove-revisions.shell = "rm -v ./src/materia_server/models/migrations/versions/*.py"
 
 [tool.pyright]
 reportGeneralTypeIssues = false
@@ -61,8 +51,18 @@ pythonpath = ["."]
 testpaths = ["tests"]
 
 
+
 [tool.pdm]
 distribution = true
+[tool.pdm.build]
+includes = ["src/materia_server"]
+
+[tool.pdm.scripts]
+start-server.cmd = "python ./src/materia_server/main.py {args:start --app-mode development --log-level debug}"
+db-upgrade.cmd = "alembic -c ./src/materia_server/alembic.ini upgrade {args:head}"
+db-downgrade.shell = "alembic -c ./src/materia_server/alembic.ini downgrade {args:base}"
+db-revision.cmd = "alembic revision {args:--autogenerate}"
+remove-revisions.shell = "rm -v ./src/materia_server/models/migrations/versions/*.py"
 
 [tool.pdm.dev-dependencies]
 dev = [
@@ -70,6 +70,7 @@ dev = [
     "pytest<8.0.0,>=7.3.2",
     "pyflakes<4.0.0,>=3.0.1",
     "pyright<2.0.0,>=1.1.314",
+    "pytest-asyncio>=0.23.7",
 ]
 
 
