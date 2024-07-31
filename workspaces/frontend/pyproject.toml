@@ -28,7 +28,7 @@ includes = [ "src/materia_frontend" ]
 [tool.pdm.scripts]
 npm-install.cmd = "npm install --prefix ./"
 npm-run-build.cmd = "npm run build --prefix ./"
-move-dist.shell = "rm -rf src/materia_frontend/dist && mv dist src/materia_frontend/"
+move-dist.shell = "rm -vrf src/materia_frontend/dist && mv -v dist src/materia_frontend/ && cp -v templates/* src/materia_frontend/dist"
 pre_build.composite = [ "npm-install", "npm-run-build", "move-dist" ]
 materia-frontend.call = "materia_frontend.main:client"
 

@@ -1,9 +1,9 @@
 import pytest_asyncio
 import pytest
 import os
-from materia_server.config import Config
-from materia_server.models import Database, User, LoginType, Repository, Directory
-from materia_server import security
+from materia.config import Config
+from materia.models import Database, User, LoginType, Repository, Directory
+from materia import security
 import sqlalchemy as sa
 from sqlalchemy.pool import NullPool
 from dataclasses import dataclass
