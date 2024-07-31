@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from fastapi.staticfiles import StaticFiles
 from PIL import Image
 import io
 from pathlib import Path
@@ -7,7 +6,6 @@ import mimetypes
 
 from materia.routers import middleware
 from materia.config import Config
-import materia_frontend
 
 router = APIRouter(tags=["resources"], prefix="/resources")
 
@@ -41,16 +39,22 @@ async def avatar(
     return Response(content=buffer.getvalue(), media_type=Image.MIME[format])
 
 
-@router.get("/assets/{filename}")
-async def assets(filename: str):
-    path = Path(materia_frontend.__path__[0]).joinpath(
-        "dist", "resources", "assets", filename
-    )
+try:
+    import materia_frontend
+except ModuleNotFoundError:
+    pass
+else:
 
-    if not path.exists():
-        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    @router.get("/assets/{filename}")
+    async def assets(filename: str):
+        path = Path(materia_frontend.__path__[0]).joinpath(
+            "dist", "resources", "assets", filename
+        )
 
-    content = path.read_bytes()
-    mime = mimetypes.guess_type(path)[0]
+        if not path.exists():
+            return Response(status_code=status.HTTP_404_NOT_FOUND)
 
-    return Response(content, media_type=mime)
+        content = path.read_bytes()
+        mime = mimetypes.guess_type(path)[0]
+
+        return Response(content, media_type=mime)

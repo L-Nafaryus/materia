@@ -69,8 +69,8 @@ includes = ["src/materia"]
 
 [tool.pdm.scripts]
 start.cmd = "python ./src/materia/main.py {args:start --app-mode development --log-level debug}"
-upgrade.cmd = "alembic -c ./src/materia/alembic.ini upgrade {args:head}"
-downgrade.shell = "alembic -c ./src/materia/alembic.ini downgrade {args:base}"
+upgrade.cmd = "alembic upgrade {args:head}"
+downgrade.cmd = "alembic downgrade {args:base}"
 rev.cmd = "alembic revision {args:--autogenerate}"
 rm-revs.shell = "rm -v ./src/materia/models/migrations/versions/*.py"
 

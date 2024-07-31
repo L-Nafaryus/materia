@@ -66,6 +66,13 @@ def make_lifespan(config: Config, logger: Logger):
 
 
 def make_application(config: Config, logger: Logger):
+    try:
+        import materia_frontend
+    except ModuleNotFoundError:
+        logger.warning(
+            "`materia_frontend` is not installed. No user interface will be served."
+        )
+
     app = FastAPI(
         title="materia",
         version="0.1.0",
