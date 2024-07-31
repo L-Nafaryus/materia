@@ -1,7 +1,7 @@
 [project]
-name = "materia-web-client"
+name = "materia-frontend"
 version = "0.1.1"
-description = "Materia web client"
+description = "Materia frontend"
 authors = [
     {name = "L-Nafaryus", email = "l.nafaryus@gmail.com"},
 ]
@@ -23,13 +23,14 @@ dev = [
 ]
 
 [tool.pdm.build]
-includes = ["src/materia_web_client", "src/materia-frontend/dist"]
+includes = [ "src/materia_frontend" ]
 
 [tool.pdm.scripts]
-npm-install.cmd = "npm install --prefix ./src/materia-frontend"
-npm-run-build.cmd = "npm run build-only --prefix ./src/materia-frontend"
-pre_build.composite = [ "npm-install", "npm-run-build" ]
-materia-web-client.call = "materia_web_client.main:client"
+npm-install.cmd = "npm install --prefix ./"
+npm-run-build.cmd = "npm run build --prefix ./"
+move-dist.shell = "rm -rf src/materia_frontend/dist && mv dist src/materia_frontend/"
+pre_build.composite = [ "npm-install", "npm-run-build", "move-dist" ]
+materia-frontend.call = "materia_frontend.main:client"
 
 [build-system]
 requires = ["pdm-backend"]

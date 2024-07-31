@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:a13078a66bba4903a78f4696c35b0e4119ad088dccf81088aa3bf8803e650b85"
+content_hash = "sha256:4122146bc4848501b79e4e97551c7835f5559cc7294aa8ec3161a9c2fd86985f"
 
 [[package]]
 name = "black"
@@ -63,14 +63,14 @@ files = [
 
 [[package]]
 name = "exceptiongroup"
-version = "1.2.1"
+version = "1.2.2"
 requires_python = ">=3.7"
 summary = "Backport of PEP 654 (exception groups)"
 groups = ["dev"]
 marker = "python_version < \"3.11\""
 files = [
-    {file = "exceptiongroup-1.2.1-py3-none-any.whl", hash = "sha256:5258b9ed329c5bbdd31a309f53cbfb0b155341807f6ff7606a1e801a891b29ad"},
-    {file = "exceptiongroup-1.2.1.tar.gz", hash = "sha256:a4785e48b045528f5bfe627b6ad554ff32def154f42372786903b7abcfe1aa16"},
+    {file = "exceptiongroup-1.2.2-py3-none-any.whl", hash = "sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b"},
+    {file = "exceptiongroup-1.2.2.tar.gz", hash = "sha256:47c2edf7c6738fafb49fd34290706d1a1a2f4d1c6df275526b62cbb4aa5393cc"},
 ]
 
 [[package]]
@@ -111,25 +111,14 @@ files = [
 ]
 
 [[package]]
-name = "nodeenv"
-version = "1.9.0"
-requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
-summary = "Node.js virtual environment builder"
-groups = ["dev"]
-files = [
-    {file = "nodeenv-1.9.0-py2.py3-none-any.whl", hash = "sha256:508ecec98f9f3330b636d4448c0f1a56fc68017c68f1e7857ebc52acf0eb879a"},
-    {file = "nodeenv-1.9.0.tar.gz", hash = "sha256:07f144e90dae547bf0d4ee8da0ee42664a42a04e02ed68e06324348dafe4bdb1"},
-]
-
-[[package]]
 name = "packaging"
-version = "24.0"
-requires_python = ">=3.7"
+version = "24.1"
+requires_python = ">=3.8"
 summary = "Core utilities for Python packages"
 groups = ["dev"]
 files = [
-    {file = "packaging-24.0-py3-none-any.whl", hash = "sha256:2ddfb553fdf02fb784c234c7ba6ccc288296ceabec964ad2eae3777778130bc5"},
-    {file = "packaging-24.0.tar.gz", hash = "sha256:eb82c5e3e56209074766e6885bb04b8c38a0c015d0a30036ebe7ece34c9989e9"},
+    {file = "packaging-24.1-py3-none-any.whl", hash = "sha256:5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"},
+    {file = "packaging-24.1.tar.gz", hash = "sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002"},
 ]
 
 [[package]]
@@ -177,20 +166,6 @@ files = [
 ]
 
 [[package]]
-name = "pyright"
-version = "1.1.365"
-requires_python = ">=3.7"
-summary = "Command line wrapper for pyright"
-groups = ["dev"]
-dependencies = [
-    "nodeenv>=1.6.0",
-]
-files = [
-    {file = "pyright-1.1.365-py3-none-any.whl", hash = "sha256:194d767a039f9034376b7ec8423841880ac6efdd061f3e283b4ad9fcd484a659"},
-    {file = "pyright-1.1.365.tar.gz", hash = "sha256:d7e69000939aed4bf823707086c30c84c005bdd39fac2dfb370f0e5be16c2ef2"},
-]
-
-[[package]]
 name = "pytest"
 version = "7.4.4"
 requires_python = ">=3.7"
@@ -223,14 +198,14 @@ files = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.12.1"
+version = "4.12.2"
 requires_python = ">=3.8"
 summary = "Backported and Experimental Type Hints for Python 3.8+"
 groups = ["dev"]
 marker = "python_version < \"3.11\""
 files = [
-    {file = "typing_extensions-4.12.1-py3-none-any.whl", hash = "sha256:6024b58b69089e5a89c347397254e35f1bf02a907728ec7fee9bf0fe837d203a"},
-    {file = "typing_extensions-4.12.1.tar.gz", hash = "sha256:915f5e35ff76f56588223f15fdd5938f9a1cf9195c0de25130c627e4d597f6d1"},
+    {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
+    {file = "typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"},
 ]
 
 [[package]]

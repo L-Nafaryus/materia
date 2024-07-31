@@ -43,7 +43,7 @@
       // {inherit meta;};
   in {
     packages.x86_64-linux = {
-      materia-frontend = dreamBuildPackage {
+      materia-frontend-nodejs = dreamBuildPackage {
         module = {
           lib,
           config,
@@ -58,7 +58,7 @@
           ];
 
           mkDerivation = {
-            src = ./materia-web-client/src/materia-frontend;
+            src = ./workspaces/frontend;
           };
 
           deps = {nixpkgs, ...}: {
@@ -74,22 +74,22 @@
           };
         };
         meta = with nixpkgs.lib; {
-          description = "Materia frontend";
+          description = "Materia frontend (nodejs)";
           license = licenses.mit;
           maintainers = with bonLib.maintainers; [L-Nafaryus];
           broken = false;
         };
       };
 
-      materia-web-client = dreamBuildPackage {
+      materia-frontend = dreamBuildPackage {
         extraArgs = {
-          inherit (self.packages.x86_64-linux) materia-frontend;
+          inherit (self.packages.x86_64-linux) materia-frontend-nodejs;
         };
         module = {
           config,
           lib,
           dream2nix,
-          materia-frontend,
+          materia-frontend-nodejs,
           ...
         }: {
           imports = [dream2nix.modules.dream2nix.WIP-python-pdm];
@@ -102,17 +102,17 @@
           };
 
           mkDerivation = {
-            src = ./materia-web-client;
+            src = ./workspaces/frontend;
             buildInputs = [
               pkgs.python3.pkgs.pdm-backend
             ];
             configurePhase = ''
-              cp -rv ${materia-frontend}/dist ./src/materia-frontend/
+              cp -rv ${materia-frontend-nodejs}/dist ./src/materia-frontend/
             '';
           };
         };
         meta = with nixpkgs.lib; {
-          description = "Materia web client";
+          description = "Materia frontend";
           license = licenses.mit;
           maintainers = with bonLib.maintainers; [L-Nafaryus];
           broken = false;
