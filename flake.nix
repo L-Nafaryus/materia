@@ -51,7 +51,7 @@
           ...
         }: {
           name = "materia-frontend";
-          version = "0.0.1";
+          version = "0.0.5";
 
           imports = [
             dream2nix.modules.dream2nix.WIP-nodejs-builder-v3
@@ -94,20 +94,20 @@
         }: {
           imports = [dream2nix.modules.dream2nix.WIP-python-pdm];
 
-          pdm.lockfile = ./materia-web-client/pdm.lock;
-          pdm.pyproject = ./materia-web-client/pyproject.toml;
+          pdm.lockfile = ./workspaces/frontend/pdm.lock;
+          pdm.pyproject = ./workspaces/frontend/pyproject.toml;
 
           deps = _: {
-            python = pkgs.python3;
+            python = pkgs.python312;
           };
 
           mkDerivation = {
             src = ./workspaces/frontend;
             buildInputs = [
-              pkgs.python3.pkgs.pdm-backend
+              pkgs.python312.pkgs.pdm-backend
             ];
             configurePhase = ''
-              cp -rv ${materia-frontend-nodejs}/dist ./src/materia-frontend/
+              cp -rv ${materia-frontend-nodejs}/dist ./src/materia_frontend/
             '';
           };
         };
@@ -119,7 +119,10 @@
         };
       };
 
-      materia-server = dreamBuildPackage {
+      materia = dreamBuildPackage {
+        extraArgs = {
+          inherit (self.packages.x86_64-linux) materia-frontend;
+        };
         module = {
           config,
           lib,
@@ -129,20 +132,23 @@
         }: {
           imports = [dream2nix.modules.dream2nix.WIP-python-pdm];
 
-          pdm.lockfile = ./materia-server/pdm.lock;
-          pdm.pyproject = ./materia-server/pyproject.toml;
+          pdm.lockfile = ./pdm.lock;
+          pdm.pyproject = ./pyproject.toml;
 
           deps = _: {
-            python = pkgs.python3;
+            python = pkgs.python312;
           };
 
           mkDerivation = {
-            src = ./materia-server;
+            src = ./.;
             buildInputs = [
-              pkgs.python3.pkgs.pdm-backend
+              pkgs.python312.pkgs.pdm-backend
             ];
             nativeBuildInputs = [
-              pkgs.python3.pkgs.wrapPython
+              pkgs.python312.pkgs.wrapPython
+            ];
+            propagatedBuildInputs = [
+              materia-frontend
             ];
           };
         };
@@ -151,7 +157,7 @@
           license = licenses.mit;
           maintainers = with bonLib.maintainers; [L-Nafaryus];
           broken = false;
-          mainProgram = "materia-server";
+          mainProgram = "materia";
         };
       };
 
@@ -160,15 +166,8 @@
       redis-devel = bonfire.packages.x86_64-linux.redis;
     };
 
-    apps.x86_64-linux = {
-      materia-server = {
-        type = "app";
-        program = "${self.packages.x86_64-linux.materia-server}/bin/materia-server";
-      };
-    };
-
     devShells.x86_64-linux.default = pkgs.mkShell {
-      buildInputs = with pkgs; [postgresql redis pdm nodejs];
+      buildInputs = with pkgs; [postgresql redis pdm nodejs python312];
       # greenlet requires libstdc++
       LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath [pkgs.stdenv.cc.cc];
     };

@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 import os
-from typing import AsyncIterator, Self
+from typing import AsyncIterator, Self, TypeAlias
 from pathlib import Path
 
 from pydantic import BaseModel, PostgresDsn
@@ -17,6 +17,8 @@ from alembic.config import Config as AlembicConfig
 from alembic.operations import Operations
 from alembic.runtime.migration import MigrationContext
 from alembic.script.base import ScriptDirectory
+import alembic_postgresql_enum
+from fastapi import HTTPException
 
 from materia.config import Config
 from materia.models.base import Base
@@ -32,16 +34,21 @@ class DatabaseMigrationError(Exception):
     pass
 
 
+SessionContext: TypeAlias = AsyncIterator[AsyncSession]
+SessionMaker: TypeAlias = async_sessionmaker[AsyncSession]
+ConnectionContext: TypeAlias = AsyncIterator[AsyncConnection]
+
+
 class Database:
     def __init__(
         self,
         url: PostgresDsn,
         engine: AsyncEngine,
-        sessionmaker: async_sessionmaker[AsyncSession],
+        sessionmaker: SessionMaker,
     ):
         self.url: PostgresDsn = url
         self.engine: AsyncEngine = engine
-        self.sessionmaker: async_sessionmaker[AsyncSession] = sessionmaker
+        self.sessionmaker: SessionMaker = sessionmaker
 
     @staticmethod
     async def new(
@@ -81,7 +88,7 @@ class Database:
         await self.engine.dispose()
 
     @asynccontextmanager
-    async def connection(self) -> AsyncIterator[AsyncConnection]:
+    async def connection(self) -> ConnectionContext:
         async with self.engine.connect() as connection:
             try:
                 yield connection
@@ -90,7 +97,7 @@ class Database:
                 raise DatabaseError(f"{e}")
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator[AsyncSession]:
+    async def session(self) -> SessionContext:
         session = self.sessionmaker()
 
         try:
@@ -98,6 +105,9 @@ class Database:
         except Exception as e:
             await session.rollback()
             raise DatabaseError(f"{e}")
+        except HTTPException:
+            # if the initial exception reaches HTTPException, then everything is handled fine (should be)
+            await session.rollback()
         finally:
             await session.close()
 

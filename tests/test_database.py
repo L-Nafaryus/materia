@@ -1,11 +1,22 @@
 import pytest_asyncio
 import pytest
 import os
+from pathlib import Path
 from materia.config import Config
-from materia.models import Database, User, LoginType, Repository, Directory
+from materia.models import (
+    Database,
+    User,
+    LoginType,
+    Repository,
+    Directory,
+    RepositoryError,
+)
+from materia.models.base import Base
+from materia.models.database import SessionContext
 from materia import security
 import sqlalchemy as sa
 from sqlalchemy.pool import NullPool
+from sqlalchemy.orm.session import make_transient
 from dataclasses import dataclass
 
 
@@ -46,7 +57,6 @@ async def db(config: Config, request) -> Database:
 
     await database.dispose()
 
-    # database_postgres = await Database.new(config_postgres.database.url())
     async with database_postgres.connection() as connection:
         await connection.execution_options(isolation_level="AUTOCOMMIT")
         await connection.execute(sa.text("drop database pytest")),
@@ -55,11 +65,23 @@ async def db(config: Config, request) -> Database:
     await database_postgres.dispose()
 
 
+"""
+@pytest.mark.asyncio
+async def test_migrations(db):
+    await db.run_migrations()
+    await db.rollback_migrations()
+"""
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_db(db: Database, request):
-    await db.run_migrations()
+    async with db.connection() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+        await connection.commit()
     yield
-    # await db.rollback_migrations()
+    async with db.connection() as connection:
+        await connection.run_sync(Base.metadata.drop_all)
+        await connection.commit()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -70,6 +92,7 @@ async def session(db: Database, request):
     await session.close()
 
 
+"""
 @pytest_asyncio.fixture(scope="session")
 async def user(config: Config, session) -> User:
     test_user = User(
@@ -93,13 +116,14 @@ async def user(config: Config, session) -> User:
     async with db.session() as session:
         await session.delete(test_user)
         await session.flush()
+"""
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="function")
 async def data(config: Config):
     class TestData:
         user = User(
-            name="pytest",
+            name="PyTest",
             lower_name="pytest",
             email="pytest@example.com",
             hashed_password=security.hash_password(
@@ -113,28 +137,58 @@ async def data(config: Config):
 
 
 @pytest.mark.asyncio
-async def test_user(data, session):
+async def test_user(data, session: SessionContext, config: Config):
+    # simple
     session.add(data.user)
     await session.flush()
 
     assert data.user.id is not None
     assert security.validate_password("iampytest", data.user.hashed_password)
 
+    await session.rollback()
+
+    # methods
+    await data.user.new(session, config)
+
+    assert data.user.id is not None
+    assert await data.user.count(session) == 1
+    assert await User.by_name("PyTest", session) == data.user
+    assert await User.by_email("pytest@example.com", session) == data.user
+
+    await data.user.edit_name("AsyncPyTest", session)
+    assert await User.by_name("asyncpytest", session, with_lower=True) == data.user
+
+    await data.user.remove(session)
+
 
 @pytest.mark.asyncio
-async def test_repository(data, session, config):
+async def test_repository(data, tmpdir, session: SessionContext, config: Config):
+    config.application.working_directory = Path(tmpdir)
+
     session.add(data.user)
     await session.flush()
 
-    repository = Repository(user_id=data.user.id, capacity=config.repository.capacity)
-    session.add(repository)
-    await session.flush()
+    repository = await Repository(
+        user_id=data.user.id, capacity=config.repository.capacity
+    ).new(session, config)
 
+    assert repository
     assert repository.id is not None
+    assert (await repository.path(session, config)).exists()
+    assert await Repository.from_user(data.user, session) == repository
+
+    await repository.remove(session, config)
+    make_transient(repository)
+    session.add(repository)
+    await session.flush()
+    with pytest.raises(RepositoryError):
+        await repository.remove(session, config)
+    assert not (await repository.path(session, config)).exists()
 
 
 @pytest.mark.asyncio
-async def test_directory(data, session, config):
+async def test_directory(data, tmpdir, session: SessionContext, config: Config):
+    # setup
     session.add(data.user)
     await session.flush()
 
@@ -142,12 +196,11 @@ async def test_directory(data, session, config):
     session.add(repository)
     await session.flush()
 
-    directory = Directory(
-        repository_id=repository.id, parent_id=None, name="test1", path=None
-    )
+    directory = Directory(repository_id=repository.id, parent_id=None, name="test1")
     session.add(directory)
     await session.flush()
 
+    # simple
     assert directory.id is not None
     assert (
         await session.scalars(
@@ -155,17 +208,16 @@ async def test_directory(data, session, config):
                 sa.and_(
                     Directory.repository_id == repository.id,
                     Directory.name == "test1",
-                    Directory.path.is_(None),
                 )
             )
         )
     ).first() == directory
 
+    # nested simple
     nested_directory = Directory(
         repository_id=repository.id,
         parent_id=directory.id,
         name="test_nested",
-        path="test1",
     )
     session.add(nested_directory)
     await session.flush()
@@ -177,7 +229,6 @@ async def test_directory(data, session, config):
                 sa.and_(
                     Directory.repository_id == repository.id,
                     Directory.name == "test_nested",
-                    Directory.path == "test1",
                 )
             )
         )

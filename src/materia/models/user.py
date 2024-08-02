@@ -1,5 +1,5 @@
 from uuid import UUID, uuid4
-from typing import Optional
+from typing import Optional, Self
 import time
 import re
 
@@ -9,13 +9,20 @@ from sqlalchemy import BigInteger, Enum
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 import sqlalchemy as sa
 
+from materia import security
 from materia.models.base import Base
 from materia.models.auth.source import LoginType
 from materia.models import database
+from materia.models.database import SessionContext
+from materia.config import Config
 from loguru import logger
 
 valid_username = re.compile(r"^[\da-zA-Z][-.\w]*$")
 invalid_username = re.compile(r"[-._]{2,}|[-._]$")
+
+
+class UserError(Exception):
+    pass
 
 
 class User(Base):
@@ -43,6 +50,23 @@ class User(Base):
 
     repository: Mapped["Repository"] = relationship(back_populates="user")
 
+    async def new(self, session: SessionContext, config: Config) -> Optional[Self]:
+        # Provide checks outer
+
+        session.add(self)
+        await session.flush()
+        return self
+
+    async def remove(self, session: SessionContext):
+        session.add(self)
+        await session.refresh(self, attribute_names=["repository"])
+
+        if self.repository:
+            await self.repository.remove()
+
+        await session.delete(self)
+        await session.flush()
+
     def update_last_login(self):
         self.last_login = int(time.time())
 
@@ -53,37 +77,74 @@ class User(Base):
         return self.login_type == LoginType.OAuth2
 
     @staticmethod
-    def is_valid_username(name: str) -> bool:
+    def check_username(name: str) -> bool:
         return bool(valid_username.match(name) and not invalid_username.match(name))
 
     @staticmethod
-    async def count(db: database.Database):
-        async with db.session() as session:
-            return await session.scalar(sa.select(sa.func.count(User.id)))
+    def check_password(password: str, config: Config) -> bool:
+        if len(password) < config.security.password_min_length:
+            return False
 
     @staticmethod
-    async def by_name(name: str, db: database.Database):
-        async with db.session() as session:
-            return (
-                await session.scalars(sa.select(User).where(User.name == name))
-            ).first()
+    async def count(session: SessionContext) -> Optional[int]:
+        return await session.scalar(sa.select(sa.func.count(User.id)))
 
     @staticmethod
-    async def by_email(email: str, db: database.Database):
-        async with db.session() as session:
-            return (
-                await session.scalars(sa.select(User).where(User.email == email))
-            ).first()
+    async def by_name(
+        name: str, session: SessionContext, with_lower: bool = False
+    ) -> Optional[Self]:
+        if with_lower:
+            query = User.lower_name == name.lower()
+        else:
+            query = User.name == name
+        return (await session.scalars(sa.select(User).where(query))).first()
 
     @staticmethod
-    async def by_id(id: UUID, db: database.Database):
-        async with db.session() as session:
-            return (await session.scalars(sa.select(User).where(User.id == id))).first()
+    async def by_email(email: str, session: SessionContext) -> Optional[Self]:
+        return (
+            await session.scalars(sa.select(User).where(User.email == email))
+        ).first()
 
-    async def remove(self, db: database.Database):
-        async with db.session() as session:
-            await session.delete(self)
-            await session.commit()
+    @staticmethod
+    async def by_id(id: UUID, session: SessionContext) -> Optional[Self]:
+        return (await session.scalars(sa.select(User).where(User.id == id))).first()
+
+    async def edit_name(self, name: str, session: SessionContext) -> Self:
+        if not User.check_username(name):
+            raise UserError(f"Invalid username: {name}")
+
+        self.name = name
+        self.lower_name = name.lower()
+        session.add(self)
+        await session.flush()
+
+        return self
+
+    async def edit_password(
+        self, password: str, session: SessionContext, config: Config
+    ) -> Self:
+        if not User.check_password(password, config):
+            raise UserError("Invalid password")
+
+        self.hashed_password = security.hash_password(
+            password, algo=config.security.password_hash_algo
+        )
+
+        session.add(self)
+        await session.flush()
+
+        return self
+
+    async def edit_email(self):
+        pass
+
+    def info(self) -> "UserInfo":
+        user_info = UserInfo.model_validate(self)
+
+        if user_info.is_email_private:
+            user_info.email = None
+
+        return user_info
 
 
 class UserCredentials(BaseModel):

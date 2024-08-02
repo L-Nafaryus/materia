@@ -1,6 +1,8 @@
 from time import time
 from typing import List, Self, Optional
 from uuid import UUID, uuid4
+from pathlib import Path
+import shutil
 
 from sqlalchemy import BigInteger, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
@@ -10,6 +12,12 @@ from pydantic import BaseModel, ConfigDict
 
 from materia.models.base import Base
 from materia.models import database
+from materia.models.database import SessionContext
+from materia.config import Config
+
+
+class RepositoryError(Exception):
+    pass
 
 
 class Repository(Base):
@@ -23,6 +31,57 @@ class Repository(Base):
     directories: Mapped[List["Directory"]] = relationship(back_populates="repository")
     files: Mapped[List["File"]] = relationship(back_populates="repository")
 
+    async def new(self, session: SessionContext, config: Config) -> Optional[Self]:
+        session.add(self)
+        await session.flush()
+        repository_path = await self.path(session, config)
+
+        try:
+            repository_path.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise RepositoryError(
+                f"Failed to create repository at /{repository_path.relative_to(config.application.working_directory)}:",
+                *e.args,
+            )
+
+        await session.flush()
+
+        return self
+
+    async def path(self, session: SessionContext, config: Config) -> Path:
+        session.add(self)
+        await session.refresh(self, attribute_names=["user"])
+
+        repository_path = config.application.working_directory.joinpath(
+            "repository", self.user.lower_name, "default"
+        )
+
+        return repository_path
+
+    async def remove(self, session: SessionContext, config: Config):
+        session.add(self)
+        await session.refresh(self, attribute_names=["directories", "files"])
+
+        for directory in self.directories:
+            if directory.is_root():
+                await directory.remove(session)
+
+        for file in self.files:
+            await file.remove(session)
+
+        repository_path = await self.path(session, config)
+
+        try:
+            shutil.rmtree(str(repository_path))
+        except OSError as e:
+            raise RepositoryError(
+                f"Failed to remove repository at /{repository_path.relative_to(config.application.working_directory)}:",
+                *e.args,
+            )
+
+        await session.delete(self)
+        await session.flush()
+
     def to_dict(self) -> dict:
         return {
             k: getattr(self, k)
@@ -30,33 +89,20 @@ class Repository(Base):
             if isinstance(v, InstrumentedAttribute)
         }
 
-    async def create(self, db: database.Database):
-        async with db.session() as session:
-            session.add(self)
-            await session.commit()
-
-    async def update(self, db: database.Database):
-        async with db.session() as session:
-            await session.execute(
-                sa.update(Repository)
-                .where(Repository.id == self.id)
-                .values(self.to_dict())
-            )
-            await session.commit()
+    async def update(self, session: SessionContext):
+        await session.execute(
+            sa.update(Repository).values(self.to_dict()).where(Repository.id == self.id)
+        )
+        await session.flush()
 
     @staticmethod
-    async def by_user_id(user_id: UUID, db: database.Database) -> Self | None:
-        async with db.session() as session:
-            return (
-                await session.scalars(
-                    sa.select(Repository).where(Repository.user_id == user_id)
-                )
-            ).first()
+    async def from_user(user: "User", session: SessionContext) -> Optional[Self]:
+        session.add(user)
+        await session.refresh(user, attribute_names=["repository"])
+        return user.repository
 
-    async def remove(self, db: database.Database):
-        async with db.session() as session:
-            await session.delete(self)
-            await session.commit()
+    async def info(self) -> "RepositoryInfo":
+        return RepositoryInfo.model_validate(self)
 
 
 class RepositoryInfo(BaseModel):

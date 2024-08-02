@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 939b37d98be0
+Revision ID: bf2ef6c7ab70
 Revises: 
-Create Date: 2024-06-24 15:39:38.380581
+Create Date: 2024-08-02 18:37:01.697075
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '939b37d98be0'
+revision: str = 'bf2ef6c7ab70'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -65,7 +65,7 @@ def upgrade() -> None:
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
     sa.Column('capacity', sa.BigInteger(), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('directory',
@@ -75,7 +75,6 @@ def upgrade() -> None:
     sa.Column('created', sa.BigInteger(), nullable=False),
     sa.Column('updated', sa.BigInteger(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
-    sa.Column('path', sa.String(), nullable=True),
     sa.Column('is_public', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['parent_id'], ['directory.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['repository_id'], ['repository.id'], ondelete='CASCADE'),
@@ -110,7 +109,7 @@ def upgrade() -> None:
     sa.Column('path', sa.String(), nullable=True),
     sa.Column('is_public', sa.Boolean(), nullable=False),
     sa.Column('size', sa.BigInteger(), nullable=False),
-    sa.ForeignKeyConstraint(['parent_id'], ['directory.id'], ),
+    sa.ForeignKeyConstraint(['parent_id'], ['directory.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['repository_id'], ['repository.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )

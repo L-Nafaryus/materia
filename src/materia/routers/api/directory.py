@@ -43,7 +43,6 @@ async def create(
                 repository_id=user.repository.id,
                 parent_id=current_directory.id if current_directory else None,
                 name=part,
-                path=None if current_path == Path() else str(current_path),
             )
 
             try:

@@ -20,6 +20,7 @@ from materia.models.repository import (
     Repository,
     RepositoryInfo,
     RepositoryContent,
+    RepositoryError,
 )
 
 from materia.models.directory import Directory, DirectoryLink, DirectoryInfo
