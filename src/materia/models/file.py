@@ -1,14 +1,23 @@
 from time import time
 from typing import Optional, Self
 from pathlib import Path
+import aioshutil
 
-from sqlalchemy import BigInteger, ForeignKey
+from sqlalchemy import BigInteger, ForeignKey, inspect
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 import sqlalchemy as sa
 from pydantic import BaseModel, ConfigDict
+import aiofiles
+import aiofiles.os
 
 from materia.models.base import Base
 from materia.models import database
+from materia.models.database import SessionContext
+from materia.config import Config
+
+
+class FileError(Exception):
+    pass
 
 
 class File(Base):
@@ -24,40 +33,184 @@ class File(Base):
     created: Mapped[int] = mapped_column(BigInteger, nullable=False, default=time)
     updated: Mapped[int] = mapped_column(BigInteger, nullable=False, default=time)
     name: Mapped[str]
-    path: Mapped[str] = mapped_column(nullable=True)
     is_public: Mapped[bool] = mapped_column(default=False)
-    size: Mapped[int] = mapped_column(BigInteger)
+    size: Mapped[int] = mapped_column(BigInteger, nullable=True)
 
     repository: Mapped["Repository"] = relationship(back_populates="files")
     parent: Mapped["Directory"] = relationship(back_populates="files")
     link: Mapped["FileLink"] = relationship(back_populates="file")
 
+    async def new(
+        self, data: bytes, session: SessionContext, config: Config
+    ) -> Optional[Self]:
+        session.add(self)
+        await session.flush()
+        await session.refresh(self, attribute_names=["repository"])
+
+        relative_path = await self.relative_path(session)
+        file_path = await self.path(session, config)
+        size = None
+
+        try:
+            async with aiofiles.open(file_path, mode="wb") as file:
+                await file.write(data)
+            size = (await aiofiles.os.stat(file_path)).st_size
+        except OSError as e:
+            raise FileError(f"Failed to write file at /{relative_path}", *e.args)
+
+        self.size = size
+        await session.flush()
+
+        return self
+
+    async def remove(self, session: SessionContext, config: Config):
+        session.add(self)
+
+        relative_path = await self.relative_path(session)
+        file_path = await self.path(session, config)
+
+        try:
+            await aiofiles.os.remove(file_path)
+        except OSError as e:
+            raise FileError(f"Failed to remove file at /{relative_path}:", *e.args)
+
+        await session.delete(self)
+        await session.flush()
+
+    async def relative_path(self, session: SessionContext) -> Optional[Path]:
+        if inspect(self).was_deleted:
+            return None
+
+        file_path = Path()
+
+        async with session.begin_nested():
+            session.add(self)
+            await session.refresh(self, attribute_names=["parent"])
+
+            if self.parent:
+                file_path = await self.parent.relative_path(session)
+
+        return file_path.joinpath(self.name)
+
+    async def path(self, session: SessionContext, config: Config) -> Optional[Path]:
+        if inspect(self).was_deleted:
+            return None
+
+        file_path = Path()
+
+        async with session.begin_nested():
+            session.add(self)
+            await session.refresh(self, attribute_names=["repository", "parent"])
+
+            if self.parent:
+                file_path = await self.parent.path(session, config)
+            else:
+                file_path = await self.repository.path(session, config)
+
+        return file_path.joinpath(self.name)
+
     @staticmethod
     async def by_path(
-        repository_id: int, path: Path | None, name: str, db: database.Database
-    ) -> Self | None:
-        async with db.session() as session:
-            query_path = (
-                File.path == str(path)
-                if isinstance(path, Path)
-                else File.path.is_(None)
-            )
-            return (
-                await session.scalars(
-                    sa.select(File).where(
-                        sa.and_(
-                            File.repository_id == repository_id,
-                            File.name == name,
-                            query_path,
-                        )
+        repository: "Repository", path: Path, session: SessionContext, config: Config
+    ) -> Optional[Self]:
+        if path == Path():
+            raise FileError("Cannot find file by empty path")
+
+        parent_directory = await Directory.by_path(
+            repository, path.parent, session, config
+        )
+
+        current_file = (
+            await session.scalars(
+                sa.select(File).where(
+                    sa.and_(
+                        File.repository_id == repository.id,
+                        File.name == path.name,
+                        (
+                            File.parent_id == parent_directory.id
+                            if parent_directory
+                            else File.parent_id.is_(None)
+                        ),
                     )
                 )
-            ).first()
+            )
+        ).first()
 
-    async def remove(self, db: database.Database):
-        async with db.session() as session:
-            await session.delete(self)
-            await session.commit()
+        return current_file
+
+    async def copy(
+        self, directory: Optional["Directory"], session: SessionContext, config: Config
+    ) -> Self:
+        pass
+
+    async def move(
+        self, directory: Optional["Directory"], session: SessionContext, config: Config
+    ) -> Self:
+        session.add(self)
+        await session.refresh(self, attribute_names=["repository"])
+
+        repository_path = await self.repository.path(session, config)
+        file_path = await self.path(session, config)
+        directory_path = (
+            await directory.path(session, config) if directory else repository_path
+        )
+        new_path = File.generate_name(file_path, directory_path, self.name)
+
+        try:
+            await aioshutil.move(file_path, new_path)
+        except OSError as e:
+            raise FileError("Failed to move file:", *e.args)
+
+        self.parent_id = directory.id if directory else None
+        await session.flush()
+
+        return self
+
+    @staticmethod
+    def generate_name(old_file: Path, target_directory: Path, name: str) -> Path:
+        new_path = target_directory.joinpath(name)
+        identity = 1
+
+        while True:
+            if new_path == old_file:
+                break
+            if not new_path.exists():
+                break
+
+            new_path = target_directory.joinpath(
+                f"{name.removesuffix(new_path.suffix)}.{str(identity)}{new_path.suffix}"
+            )
+            identity += 1
+
+        return new_path
+
+    async def rename(self, name: str, session: SessionContext, config: Config) -> Self:
+        session.add(self)
+
+        file_path = await self.path(session, config)
+        relative_path = await self.relative_path(session)
+        new_path = File.generate_name(file_path, file_path.parent, name)
+
+        try:
+            await aiofiles.os.rename(file_path, new_path)
+        except OSError as e:
+            raise FileError(f"Failed to rename file at /{relative_path}", *e.args)
+
+        self.name = new_path.name
+        await session.flush()
+        return self
+
+    async def info(self) -> Optional["FileInfo"]:
+        if self.is_public:
+            return FileInfo.model_validate(self)
+        return None
+
+
+def convert_bytes(size: int):
+    for unit in ["bytes", "kB", "MB", "GB", "TB"]:
+        if size < 1024:
+            return f"{size}{unit}" if unit == "bytes" else f"{size:.1f}{unit}"
+        size >>= 10
 
 
 class FileLink(Base):
@@ -80,7 +233,6 @@ class FileInfo(BaseModel):
     created: int
     updated: int
     name: str
-    path: Optional[str]
     is_public: bool
     size: int
 

@@ -5,7 +5,29 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:1b3ad8e836b4c01729baf2a537f2c7c543495cd762f914bb7cfd518b1634ab2d"
+content_hash = "sha256:fe3214096aaef3097e2009f717762fb370bb726aa89a52e7b2a40d60016be987"
+
+[[package]]
+name = "aiofiles"
+version = "24.1.0"
+requires_python = ">=3.8"
+summary = "File support for asyncio."
+groups = ["default"]
+files = [
+    {file = "aiofiles-24.1.0-py3-none-any.whl", hash = "sha256:b4ec55f4195e3eb5d7abd1bf7e061763e864dd4954231fb8539a0ef8bb8260e5"},
+    {file = "aiofiles-24.1.0.tar.gz", hash = "sha256:22a075c9e5a3810f0c2e48f3008c94d68c65d763b9b03857924c99e57355166c"},
+]
+
+[[package]]
+name = "aioshutil"
+version = "1.5"
+requires_python = ">=3.8"
+summary = "Asynchronous shutil module."
+groups = ["default"]
+files = [
+    {file = "aioshutil-1.5-py3-none-any.whl", hash = "sha256:bc2a6cdcf1a8615b62f856154fd81131031d03f2834912ebb06d8a2391253652"},
+    {file = "aioshutil-1.5.tar.gz", hash = "sha256:2756d6cd3bb03405dc7348ac11a0b60eb949ebd63cdd15f56e922410231c1201"},
+]
 
 [[package]]
 name = "aiosmtplib"

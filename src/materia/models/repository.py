@@ -34,13 +34,17 @@ class Repository(Base):
     async def new(self, session: SessionContext, config: Config) -> Optional[Self]:
         session.add(self)
         await session.flush()
+
         repository_path = await self.path(session, config)
+        relative_path = repository_path.relative_to(
+            config.application.working_directory
+        )
 
         try:
             repository_path.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             raise RepositoryError(
-                f"Failed to create repository at /{repository_path.relative_to(config.application.working_directory)}:",
+                f"Failed to create repository at /{relative_path}:",
                 *e.args,
             )
 

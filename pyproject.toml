@@ -34,6 +34,8 @@ dependencies = [
     "cryptography>=43.0.0",
     "python-multipart>=0.0.9",
     "jinja2>=3.1.4",
+    "aiofiles>=24.1.0",
+    "aioshutil>=1.5",
 ]
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
