@@ -47,22 +47,19 @@ class Directory(Base):
         await session.flush()
         await session.refresh(self, attribute_names=["repository"])
 
-        relative_path = await self.relative_path(session)
+        repository_path = await self.repository.path(session, config)
         directory_path = await self.path(session, config)
 
-        try:
-            directory_path.mkdir()
-        except OSError as e:
-            raise DirectoryError(
-                f"Failed to create directory at /{relative_path}:",
-                *e.args,
-            )
+        new_directory = FileSystem(directory_path, repository_path)
+        await new_directory.make_directory()
 
         return self
 
     async def remove(self, session: SessionContext, config: Config):
         session.add(self)
-        await session.refresh(self, attribute_names=["directories", "files"])
+        await session.refresh(
+            self, attribute_names=["repository", "directories", "files"]
+        )
 
         if self.directories:
             for directory in self.directories:
@@ -72,15 +69,11 @@ class Directory(Base):
             for file in self.files:
                 file.remove(session, config)
 
-        relative_path = await self.relative_path(session)
+        repository_path = await self.repository.path(session, config)
         directory_path = await self.path(session, config)
 
-        try:
-            shutil.rmtree(str(directory_path))
-        except OSError as e:
-            raise DirectoryError(
-                f"Failed to remove directory at /{relative_path}:", *e.args
-            )
+        current_directory = FileSystem(directory_path, repository_path)
+        await current_directory.remove()
 
         await session.delete(self)
         await session.flush()
@@ -153,38 +146,59 @@ class Directory(Base):
     async def copy(
         self, directory: Optional["Directory"], session: SessionContext, config: Config
     ) -> Self:
-        pass
+        session.add(self)
+        await session.refresh(self, attribute_names=["repository"])
+
+        repository_path = await self.repository.path(session, config)
+        directory_path = await self.path(session, config)
+        directory_path = (
+            await directory.path(session, config) if directory else repository_path
+        )
+
+        current_directory = FileSystem(directory_path, repository_path)
+        new_directory = await current_directory.copy(directory_path)
+
+        cloned = self.clone()
+        cloned.name = new_directory.name()
+        cloned.parent_id = directory.id if directory else None
+        session.add(cloned)
+        await session.flush()
+
+        return self
 
     async def move(
         self, directory: Optional["Directory"], session: SessionContext, config: Config
     ) -> Self:
-        pass
+        session.add(self)
+        await session.refresh(self, attribute_names=["repository"])
+
+        repository_path = await self.repository.path(session, config)
+        directory_path = await self.path(session, config)
+        directory_path = (
+            await directory.path(session, config) if directory else repository_path
+        )
+
+        current_directory = FileSystem(directory_path, repository_path)
+        moved_directory = await current_directory.move(directory_path)
+
+        self.name = moved_directory.name()
+        self.parent_id = directory.id if directory else None
+        self.updated = time()
+        await session.flush()
+
+        return self
 
     async def rename(self, name: str, session: SessionContext, config: Config) -> Self:
         session.add(self)
+        await session.refresh(self, attribute_names=["repository"])
 
+        repository_path = await self.repository.path(session, config)
         directory_path = await self.path(session, config)
-        relative_path = await self.relative_path(session)
-        new_path = directory_path.with_name(name)
-        identity = 1
 
-        while True:
-            if new_path == directory_path:
-                break
-            if not new_path.exists():
-                break
+        current_directory = FileSystem(directory_path, repository_path)
+        renamed_directory = await current_directory.rename(name, force=True)
 
-            new_path = directory_path.with_name(f"{name}.{str(identity)}")
-            identity += 1
-
-        try:
-            await aiofiles.os.rename(directory_path, new_path)
-        except OSError as e:
-            raise DirectoryError(
-                f"Failed to rename directory at /{relative_path}", *e.args
-            )
-
-        self.name = new_path.name
+        self.name = renamed_directory.name()
         await session.flush()
         return self
 
@@ -222,3 +236,4 @@ class DirectoryInfo(BaseModel):
 
 from materia.models.repository import Repository
 from materia.models.file import File
+from materia.models.filesystem import FileSystem

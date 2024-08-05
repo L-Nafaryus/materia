@@ -16,6 +16,8 @@ from materia.models.database import (
 
 from materia.models.user import User, UserCredentials, UserInfo
 
+from materia.models.filesystem import FileSystem
+
 from materia.models.repository import (
     Repository,
     RepositoryInfo,

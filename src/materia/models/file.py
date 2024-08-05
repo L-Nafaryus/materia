@@ -47,18 +47,12 @@ class File(Base):
         await session.flush()
         await session.refresh(self, attribute_names=["repository"])
 
-        relative_path = await self.relative_path(session)
         file_path = await self.path(session, config)
-        size = None
 
-        try:
-            async with aiofiles.open(file_path, mode="wb") as file:
-                await file.write(data)
-            size = (await aiofiles.os.stat(file_path)).st_size
-        except OSError as e:
-            raise FileError(f"Failed to write file at /{relative_path}", *e.args)
+        new_file = FileSystem(file_path, await self.repository.path(session, config))
+        await new_file.write_file(data)
 
-        self.size = size
+        self.size = await new_file.size()
         await session.flush()
 
         return self
@@ -66,13 +60,10 @@ class File(Base):
     async def remove(self, session: SessionContext, config: Config):
         session.add(self)
 
-        relative_path = await self.relative_path(session)
         file_path = await self.path(session, config)
 
-        try:
-            await aiofiles.os.remove(file_path)
-        except OSError as e:
-            raise FileError(f"Failed to remove file at /{relative_path}:", *e.args)
+        new_file = FileSystem(file_path, await self.repository.path(session, config))
+        await new_file.remove()
 
         await session.delete(self)
         await session.flush()
@@ -149,15 +140,12 @@ class File(Base):
         directory_path = (
             await directory.path(session, config) if directory else repository_path
         )
-        new_path = File.generate_name(file_path, directory_path, self.name)
 
-        try:
-            await aioshutil.copy(file_path, new_path)
-        except OSError as e:
-            raise FileError("Failed to move file:", *e.args)
+        current_file = FileSystem(file_path, repository_path)
+        new_file = await current_file.copy(directory_path)
 
         cloned = self.clone()
-        cloned.name = new_path.name
+        cloned.name = new_file.name()
         cloned.parent_id = directory.id if directory else None
         session.add(cloned)
         await session.flush()
@@ -175,51 +163,28 @@ class File(Base):
         directory_path = (
             await directory.path(session, config) if directory else repository_path
         )
-        new_path = File.generate_name(file_path, directory_path, self.name)
 
-        try:
-            await aioshutil.move(file_path, new_path)
-        except OSError as e:
-            raise FileError("Failed to move file:", *e.args)
+        current_file = FileSystem(file_path, repository_path)
+        moved_file = await current_file.move(directory_path)
 
-        self.name = new_path.name
+        self.name = moved_file.name()
         self.parent_id = directory.id if directory else None
         self.updated = time()
         await session.flush()
 
         return self
 
-    @staticmethod
-    def generate_name(old_file: Path, target_directory: Path, name: str) -> Path:
-        new_path = target_directory.joinpath(name)
-        identity = 1
-
-        while True:
-            if new_path == old_file:
-                break
-            if not new_path.exists():
-                break
-
-            new_path = target_directory.joinpath(
-                f"{name.removesuffix(new_path.suffix)}.{str(identity)}{new_path.suffix}"
-            )
-            identity += 1
-
-        return new_path
-
     async def rename(self, name: str, session: SessionContext, config: Config) -> Self:
         session.add(self)
+        await session.refresh(self, attribute_names=["repository"])
 
+        repository_path = await self.repository.path(session, config)
         file_path = await self.path(session, config)
-        relative_path = await self.relative_path(session)
-        new_path = File.generate_name(file_path, file_path.parent, name)
 
-        try:
-            await aiofiles.os.rename(file_path, new_path)
-        except OSError as e:
-            raise FileError(f"Failed to rename file at /{relative_path}", *e.args)
+        current_file = FileSystem(file_path, repository_path)
+        renamed_file = await current_file.rename(name, force=True)
 
-        self.name = new_path.name
+        self.name = renamed_file.name()
         self.updated = time()
         await session.flush()
         return self
@@ -263,3 +228,4 @@ class FileInfo(BaseModel):
 
 from materia.models.repository import Repository
 from materia.models.directory import Directory
+from materia.models.filesystem import FileSystem

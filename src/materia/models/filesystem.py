@@ -44,6 +44,9 @@ class FileSystem:
     async def is_directory(self) -> bool:
         return await async_path.isdir(self.path)
 
+    def name(self) -> str:
+        return self.path.name
+
     async def remove(self):
         try:
             if await self.is_file():
@@ -67,18 +70,18 @@ class FileSystem:
             return name
 
         while await async_path.exists(new_path):
-            if self.is_file():
-                if with_counter := re.match(r"^(.+)(\.\d+)(\.\w+)$", new_path.name):
+            if await self.is_file():
+                if with_counter := re.match(r"^(.+)\.(\d+)\.(\w+)$", new_path.name):
                     new_name, _, extension = with_counter.groups()
-                elif with_extension := re.match(r"^(.+)(\.\w+)$", new_path.name):
+                elif with_extension := re.match(r"^(.+)\.(\w+)$", new_path.name):
                     new_name, extension = with_extension.groups()
 
                 new_path = target_directory.joinpath(
                     "{}.{}.{}".format(new_name, count, extension)
                 )
 
-            if self.is_directory():
-                if with_counter := re.match(r"^(.+)(\.\d+)$", new_path.name):
+            if await self.is_directory():
+                if with_counter := re.match(r"^(.+)\.(\d+)$", new_path.name):
                     new_name, _ = with_counter.groups()
                 else:
                     new_name = new_path.name
@@ -106,12 +109,10 @@ class FileSystem:
                     "Failed to move content to target destination: already exists"
                 )
 
-            await aioshutil.move(
-                self.path,
-                target_directory.joinpath(
-                    await self.generate_name(target_directory, new_name)
-                ),
+            new_path = target_directory.joinpath(
+                await self.generate_name(target_directory, new_name)
             )
+            await aioshutil.move(self.path, new_path)
 
         except Exception as e:
             raise FileSystemError(
@@ -119,15 +120,17 @@ class FileSystem:
                 *e.args,
             )
 
-    async def rename(self, new_name: str, force: bool = False):
-        await self.move(self.path.parent, new_name=new_name, force=force)
+        return FileSystem(new_path, self.working_directory)
+
+    async def rename(self, new_name: str, force: bool = False) -> Path:
+        return await self.move(self.path.parent, new_name=new_name, force=force)
 
     async def copy(
         self,
         target_directory: Path,
         new_name: Optional[str] = None,
         force: bool = False,
-    ):
+    ) -> Self:
         new_name = new_name if new_name else self.path.name
 
         try:
@@ -154,6 +157,8 @@ class FileSystem:
                 f"Failed to copy content from /{self.relative_path}:",
                 *e.args,
             )
+
+        return FileSystem(new_path, self.working_directory)
 
     async def make_directory(self):
         try:
