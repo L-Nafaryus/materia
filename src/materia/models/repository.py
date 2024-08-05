@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from pathlib import Path
 import shutil
 
-from sqlalchemy import BigInteger, ForeignKey
+from sqlalchemy import BigInteger, ForeignKey, inspect
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 import sqlalchemy as sa
@@ -85,13 +85,6 @@ class Repository(Base):
 
         await session.delete(self)
         await session.flush()
-
-    def to_dict(self) -> dict:
-        return {
-            k: getattr(self, k)
-            for k, v in Repository.__dict__.items()
-            if isinstance(v, InstrumentedAttribute)
-        }
 
     async def update(self, session: SessionContext):
         await session.execute(

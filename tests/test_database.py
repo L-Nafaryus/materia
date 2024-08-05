@@ -181,6 +181,13 @@ async def test_repository(data, tmpdir, session: SessionContext, config: Config)
     assert (await repository.path(session, config)).exists()
     assert await Repository.from_user(data.user, session) == repository
 
+    await session.refresh(repository, attribute_names=["user"])
+    cloned_repository = repository.clone()
+    assert cloned_repository.id is None and cloned_repository.user is None
+    session.add(cloned_repository)
+    await session.flush()
+    assert cloned_repository.id is not None
+
     await repository.remove(session, config)
     make_transient(repository)
     session.add(repository)

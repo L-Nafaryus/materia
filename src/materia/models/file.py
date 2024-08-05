@@ -141,7 +141,28 @@ class File(Base):
     async def copy(
         self, directory: Optional["Directory"], session: SessionContext, config: Config
     ) -> Self:
-        pass
+        session.add(self)
+        await session.refresh(self, attribute_names=["repository"])
+
+        repository_path = await self.repository.path(session, config)
+        file_path = await self.path(session, config)
+        directory_path = (
+            await directory.path(session, config) if directory else repository_path
+        )
+        new_path = File.generate_name(file_path, directory_path, self.name)
+
+        try:
+            await aioshutil.copy(file_path, new_path)
+        except OSError as e:
+            raise FileError("Failed to move file:", *e.args)
+
+        cloned = self.clone()
+        cloned.name = new_path.name
+        cloned.parent_id = directory.id if directory else None
+        session.add(cloned)
+        await session.flush()
+
+        return self
 
     async def move(
         self, directory: Optional["Directory"], session: SessionContext, config: Config
@@ -161,7 +182,9 @@ class File(Base):
         except OSError as e:
             raise FileError("Failed to move file:", *e.args)
 
+        self.name = new_path.name
         self.parent_id = directory.id if directory else None
+        self.updated = time()
         await session.flush()
 
         return self
@@ -197,6 +220,7 @@ class File(Base):
             raise FileError(f"Failed to rename file at /{relative_path}", *e.args)
 
         self.name = new_path.name
+        self.updated = time()
         await session.flush()
         return self
 
