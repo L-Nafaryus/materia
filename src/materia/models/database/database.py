@@ -80,7 +80,7 @@ class Database:
                 async with database.connection() as connection:
                     await connection.rollback()
             except Exception as e:
-                raise DatabaseError(f"{e}")
+                raise DatabaseError(f"Failed to connect to database: {url}") from e
 
         return database
 
@@ -94,7 +94,7 @@ class Database:
                 yield connection
             except Exception as e:
                 await connection.rollback()
-                raise DatabaseError(f"{e}")
+                raise DatabaseError(*e.args) from e
 
     @asynccontextmanager
     async def session(self) -> SessionContext:
@@ -102,12 +102,12 @@ class Database:
 
         try:
             yield session
+        except HTTPException as e:
+            await session.rollback()
+            raise e from None
         except Exception as e:
             await session.rollback()
-            raise DatabaseError(f"{e}")
-        except HTTPException:
-            # if the initial exception reaches HTTPException, then everything is handled fine (should be)
-            await session.rollback()
+            raise DatabaseError(*e.args) from e
         finally:
             await session.close()
 

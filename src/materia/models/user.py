@@ -1,5 +1,5 @@
 from uuid import UUID, uuid4
-from typing import Optional, Self
+from typing import Optional, Self, BinaryIO
 import time
 import re
 
@@ -8,6 +8,9 @@ import pydantic
 from sqlalchemy import BigInteger, Enum
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 import sqlalchemy as sa
+from PIL import Image
+from sqids.sqids import Sqids
+from aiofiles import os as async_os
 
 from materia import security
 from materia.models.base import Base
@@ -82,8 +85,7 @@ class User(Base):
 
     @staticmethod
     def check_password(password: str, config: Config) -> bool:
-        if len(password) < config.security.password_min_length:
-            return False
+        return not len(password) < config.security.password_min_length
 
     @staticmethod
     async def count(session: SessionContext) -> Optional[int]:
@@ -146,6 +148,57 @@ class User(Base):
 
         return user_info
 
+    async def edit_avatar(
+        self, avatar: BinaryIO | None, session: SessionContext, config: Config
+    ):
+        avatar_dir = config.application.working_directory.joinpath("avatars")
+
+        if avatar is None:
+            if self.avatar is None:
+                return
+
+            avatar_file = FileSystem(
+                avatar_dir.joinpath(self.avatar), config.application.working_directory
+            )
+            if await avatar_file.exists():
+                await avatar_file.remove()
+
+            session.add(self)
+            self.avatar = None
+            await session.flush()
+
+            return
+
+        try:
+            image = Image.open(avatar)
+        except Exception as e:
+            raise UserError("Failed to read avatar data") from e
+
+        avatar_hashes: list[str] = (
+            await session.scalars(sa.select(User.avatar).where(User.avatar.isnot(None)))
+        ).all()
+        avatar_id = Sqids(min_length=10, blocklist=avatar_hashes).encode(
+            [int(time.time())]
+        )
+
+        try:
+            if not avatar_dir.exists():
+                await async_os.mkdir(avatar_dir)
+            image.save(avatar_dir.joinpath(avatar_id), format=image.format)
+        except Exception as e:
+            raise UserError(f"Failed to save avatar: {e}") from e
+
+        if old_avatar := self.avatar:
+            avatar_file = FileSystem(
+                avatar_dir.joinpath(old_avatar), config.application.working_directory
+            )
+            if await avatar_file.exists():
+                await avatar_file.remove()
+
+        session.add(self)
+        self.avatar = avatar_id
+        await session.flush()
+
 
 class UserCredentials(BaseModel):
     name: str
@@ -177,3 +230,4 @@ class UserInfo(BaseModel):
 
 
 from materia.models.repository import Repository
+from materia.models.filesystem import FileSystem

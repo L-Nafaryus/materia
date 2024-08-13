@@ -82,15 +82,17 @@ async def jwt_cookie(request: Request, response: Response, ctx: Context = Depend
     except jwt.PyJWTError as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"Invalid token: {e}")
 
-    if not await User.by_id(uuid.UUID(access_claims.sub), ctx.database):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid user")
+    async with ctx.database.session() as session:
+        if not await User.by_id(uuid.UUID(access_claims.sub), session):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid user")
 
     return access_claims
 
 
 async def user(claims=Depends(jwt_cookie), ctx: Context = Depends()) -> User:
-    if not (current_user := await User.by_id(uuid.UUID(claims.sub), ctx.database)):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing user")
+    async with ctx.database.session() as session:
+        if not (current_user := await User.by_id(uuid.UUID(claims.sub), session)):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing user")
 
     return current_user
 

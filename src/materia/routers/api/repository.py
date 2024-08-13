@@ -22,14 +22,15 @@ async def create(
     user: User = Depends(middleware.user), ctx: middleware.Context = Depends()
 ):
     async with ctx.database.session() as session:
-        if await Repository.by_user(user, session):
+        if await Repository.from_user(user, session):
             raise HTTPException(status.HTTP_409_CONFLICT, "Repository already exists")
 
     async with ctx.database.session() as session:
         try:
             await Repository(
                 user_id=user.id, capacity=ctx.config.repository.capacity
-            ).new(session)
+            ).new(session, ctx.config)
+            await session.commit()
         except Exception as e:
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=" ".join(e.args)
@@ -41,13 +42,7 @@ async def info(
     repository=Depends(middleware.repository), ctx: middleware.Context = Depends()
 ):
     async with ctx.database.session() as session:
-        session.add(repository)
-        await session.refresh(repository, attribute_names=["files"])
-
-    info = RepositoryInfo.model_validate(repository)
-    info.used = sum([file.size for file in repository.files])
-
-    return info
+        return await repository.info(session)
 
 
 @router.delete("/repository")

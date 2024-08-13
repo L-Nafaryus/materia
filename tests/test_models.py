@@ -1,143 +1,21 @@
 import pytest_asyncio
 import pytest
-import os
-import sys
 from pathlib import Path
 from materia.config import Config
 from materia.models import (
-    Database,
     User,
-    LoginType,
     Repository,
     Directory,
     RepositoryError,
     File,
 )
-from materia.models.base import Base
 from materia.models.database import SessionContext
 from materia import security
 import sqlalchemy as sa
-from sqlalchemy.pool import NullPool
 from sqlalchemy.orm.session import make_transient
 from sqlalchemy import inspect
 import aiofiles
 import aiofiles.os
-
-
-@pytest_asyncio.fixture(scope="session")
-async def config() -> Config:
-    conf = Config()
-    conf.database.port = 54320
-    # conf.application.working_directory = conf.application.working_directory / "temp"
-    # if (cwd := conf.application.working_directory.resolve()).exists():
-    #    os.chdir(cwd)
-    # if local_conf := Config.open(cwd / "config.toml"):
-    #    conf = local_conf
-    return conf
-
-
-@pytest_asyncio.fixture(scope="session")
-async def db(config: Config, request) -> Database:
-    config_postgres = config
-    config_postgres.database.user = "postgres"
-    config_postgres.database.name = "postgres"
-    database_postgres = await Database.new(
-        config_postgres.database.url(), poolclass=NullPool
-    )
-
-    async with database_postgres.connection() as connection:
-        await connection.execution_options(isolation_level="AUTOCOMMIT")
-        await connection.execute(sa.text("create role pytest login"))
-        await connection.execute(sa.text("create database pytest owner pytest"))
-        await connection.commit()
-
-    await database_postgres.dispose()
-
-    config.database.user = "pytest"
-    config.database.name = "pytest"
-    database = await Database.new(config.database.url(), poolclass=NullPool)
-
-    yield database
-
-    await database.dispose()
-
-    async with database_postgres.connection() as connection:
-        await connection.execution_options(isolation_level="AUTOCOMMIT")
-        await connection.execute(sa.text("drop database pytest")),
-        await connection.execute(sa.text("drop role pytest"))
-        await connection.commit()
-    await database_postgres.dispose()
-
-
-"""
-@pytest.mark.asyncio
-async def test_migrations(db):
-    await db.run_migrations()
-    await db.rollback_migrations()
-"""
-
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def setup_db(db: Database, request):
-    async with db.connection() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-        await connection.commit()
-    yield
-    async with db.connection() as connection:
-        await connection.run_sync(Base.metadata.drop_all)
-        await connection.commit()
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def session(db: Database, request):
-    session = db.sessionmaker()
-    yield session
-    await session.rollback()
-    await session.close()
-
-
-"""
-@pytest_asyncio.fixture(scope="session")
-async def user(config: Config, session) -> User:
-    test_user = User(
-        name="pytest",
-        lower_name="pytest",
-        email="pytest@example.com",
-        hashed_password=security.hash_password(
-            "iampytest", algo=config.security.password_hash_algo
-        ),
-        login_type=LoginType.Plain,
-        is_admin=True,
-    )
-
-    async with db.session() as session:
-        session.add(test_user)
-        await session.flush()
-        await session.refresh(test_user)
-
-    yield test_user
-
-    async with db.session() as session:
-        await session.delete(test_user)
-        await session.flush()
-"""
-
-
-@pytest_asyncio.fixture(scope="function")
-async def data(config: Config):
-    class TestData:
-        user = User(
-            name="PyTest",
-            lower_name="pytest",
-            email="pytest@example.com",
-            hashed_password=security.hash_password(
-                "iampytest", algo=config.security.password_hash_algo
-            ),
-            login_type=LoginType.Plain,
-            is_admin=True,
-        )
-
-    return TestData()
 
 
 @pytest.mark.asyncio
@@ -161,6 +39,10 @@ async def test_user(data, session: SessionContext, config: Config):
 
     await data.user.edit_name("AsyncPyTest", session)
     assert await User.by_name("asyncpytest", session, with_lower=True) == data.user
+    assert await User.by_email("pytest@example.com", session) == data.user
+    assert await User.by_id(data.user.id, session) == data.user
+    await data.user.edit_password("iamnotpytest", session, config)
+    assert security.validate_password("iamnotpytest", data.user.hashed_password)
 
     await data.user.remove(session)
 
@@ -280,9 +162,9 @@ async def test_directory(data, tmpdir, session: SessionContext, config: Config):
 
     # rename
     assert (await directory.rename("test1", session, config)).name == "test1"
-    directory2 = await Directory(
-        repository_id=repository.id, parent_id=None, name="test2"
-    ).new(session, config)
+    await Directory(repository_id=repository.id, parent_id=None, name="test2").new(
+        session, config
+    )
     assert (await directory.rename("test2", session, config)).name == "test2.1"
     assert (await repository.path(session, config)).joinpath("test2.1").exists()
     assert not (await repository.path(session, config)).joinpath("test1").exists()
@@ -358,7 +240,7 @@ async def test_file(data, tmpdir, session: SessionContext, config: Config):
     assert (
         await file.rename("test_file_rename.txt", session, config)
     ).name == "test_file_rename.txt"
-    file2 = await File(
+    await File(
         repository_id=repository.id, parent_id=directory.id, name="test_file_2.txt"
     ).new(b"", session, config)
     assert (

@@ -44,6 +44,9 @@ class Server(BaseModel):
     port: int = 54601
     domain: str = "localhost"
 
+    def url(self) -> str:
+        return "{}://{}:{}".format(self.scheme, self.address, self.port)
+
 
 class Database(BaseModel):
     backend: Literal["postgresql"] = "postgresql"

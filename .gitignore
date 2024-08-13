@@ -10,3 +10,6 @@ __pycache__/
 .pdm.toml
 .pdm-python
 .pdm-build
+
+.pytest_cache
+.coverage

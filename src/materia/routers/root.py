@@ -15,6 +15,4 @@ else:
 
     @router.get("/{spa:path}", response_class=HTMLResponse)
     async def root(request: Request):
-        return templates.TemplateResponse(
-            "base.html", {"request": request, "view": "app"}
-        )
+        return templates.TemplateResponse(request, "base.html", {"view": "app"})

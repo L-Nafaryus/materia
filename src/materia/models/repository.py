@@ -98,8 +98,14 @@ class Repository(Base):
         await session.refresh(user, attribute_names=["repository"])
         return user.repository
 
-    async def info(self) -> "RepositoryInfo":
-        return RepositoryInfo.model_validate(self)
+    async def info(self, session: SessionContext) -> "RepositoryInfo":
+        session.add(self)
+        await session.refresh(self, attribute_names=["files"])
+
+        info = RepositoryInfo.model_validate(self)
+        info.used = sum([file.size for file in self.files])
+
+        return info
 
 
 class RepositoryInfo(BaseModel):

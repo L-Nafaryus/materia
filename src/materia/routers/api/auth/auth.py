@@ -10,24 +10,21 @@ router = APIRouter(tags=["auth"])
 
 @router.post("/auth/signup")
 async def signup(body: UserCredentials, ctx: Context = Depends()):
+    if not User.check_username(body.name):
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid username"
+        )
+    if not User.check_password(body.password, ctx.config):
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Password is too short (minimum length {ctx.config.security.password_min_length})",
+        )
+
     async with ctx.database.session() as session:
-        if not User.check_username(body.name):
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid username"
-            )
-        if not User.check_password(body.password, ctx.config):
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Password is too short (minimum length {ctx.config.security.password_min_length})",
-            )
         if await User.by_name(body.name, session, with_lower=True):
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User already exists"
-            )
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="User already exists")
         if await User.by_email(body.email, session):  # type: ignore
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Email already used"
-            )
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="Email already used")
 
         count: Optional[int] = await User.count(session)
 
@@ -42,14 +39,20 @@ async def signup(body: UserCredentials, ctx: Context = Depends()):
             login_type=LoginType.Plain,
             # first registered user is admin
             is_admin=count == 0,
-        ).new(session)
+        ).new(session, ctx.config)
+
+        await session.commit()
 
 
 @router.post("/auth/signin")
 async def signin(body: UserCredentials, response: Response, ctx: Context = Depends()):
-    if (current_user := await User.by_name(body.name, ctx.database)) is None:
-        if (current_user := await User.by_email(str(body.email), ctx.database)) is None:
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid email")
+    async with ctx.database.session() as session:
+        if (current_user := await User.by_name(body.name, session)) is None:
+            if (current_user := await User.by_email(str(body.email), session)) is None:
+                raise HTTPException(
+                    status.HTTP_401_UNAUTHORIZED, detail="Invalid email"
+                )
+
     if not security.validate_password(
         body.password,
         current_user.hashed_password,
