@@ -6,6 +6,8 @@ from aiofiles import ospath as async_path
 import aioshutil
 import re
 
+valid_path = re.compile(r"^/(.*/)*([^/]*)$")
+
 
 class FileSystemError(Exception):
     pass
@@ -184,3 +186,14 @@ class FileSystem:
                 f"Failed to write file to /{self.relative_path}:",
                 *e.args,
             )
+
+    @staticmethod
+    def check_path(path: Path) -> bool:
+        return bool(valid_path.match(str(path)))
+
+    @staticmethod
+    def normalize(path: Path) -> Path:
+        if not path.is_absolute():
+            path = Path("/").joinpath(path)
+
+        return Path(*path.resolve().parts[1:])

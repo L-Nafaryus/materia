@@ -3,11 +3,12 @@ from typing import List, Optional, Self
 from pathlib import Path
 import shutil
 import aiofiles
+import re
 
 from sqlalchemy import BigInteger, ForeignKey, inspect
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 import sqlalchemy as sa
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from materia.models.base import Base
 from materia.models import database
@@ -202,8 +203,17 @@ class Directory(Base):
         await session.flush()
         return self
 
-    async def info(self) -> "DirectoryInfo":
-        return DirectoryInfo.model_validate(self)
+    async def info(self, session: SessionContext) -> "DirectoryInfo":
+        info = DirectoryInfo.model_validate(self)
+        session.add(self)
+        await session.refresh(self, attribute_names=["files"])
+        info.used = sum([file.size for file in self.files])
+
+        return info
+
+
+class DirectoryPath(BaseModel):
+    path: Path
 
 
 class DirectoryLink(Base):
@@ -228,7 +238,6 @@ class DirectoryInfo(BaseModel):
     created: int
     updated: int
     name: str
-    path: Optional[str]
     is_public: bool
 
     used: Optional[int] = None

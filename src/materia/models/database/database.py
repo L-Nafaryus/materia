@@ -3,7 +3,7 @@ import os
 from typing import AsyncIterator, Self, TypeAlias
 from pathlib import Path
 
-from pydantic import BaseModel, PostgresDsn
+from pydantic import BaseModel, PostgresDsn, ValidationError
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncEngine,
@@ -102,7 +102,7 @@ class Database:
 
         try:
             yield session
-        except HTTPException as e:
+        except (HTTPException, ValidationError) as e:
             await session.rollback()
             raise e from None
         except Exception as e:

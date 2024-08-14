@@ -25,6 +25,11 @@ from materia.models.repository import (
     RepositoryError,
 )
 
-from materia.models.directory import Directory, DirectoryLink, DirectoryInfo
+from materia.models.directory import (
+    Directory,
+    DirectoryPath,
+    DirectoryLink,
+    DirectoryInfo,
+)
 
 from materia.models.file import File, FileLink, FileInfo

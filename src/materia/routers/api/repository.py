@@ -48,18 +48,14 @@ async def info(
 @router.delete("/repository")
 async def remove(
     repository=Depends(middleware.repository),
-    repository_path=Depends(middleware.repository_path),
     ctx: middleware.Context = Depends(),
 ):
     try:
-        if repository_path.exists():
-            shutil.rmtree(str(repository_path))
-    except OSError:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to remove repository"
-        )
-
-    await repository.remove(ctx.database)
+        async with ctx.database.session() as session:
+            await repository.remove(session, ctx.config)
+            await session.commit()
+    except Exception as e:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"{e}")
 
 
 @router.get("/repository/content", response_model=RepositoryContent)

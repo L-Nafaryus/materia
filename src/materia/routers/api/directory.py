@@ -4,130 +4,111 @@ import shutil
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from materia.models import User, Directory, DirectoryInfo
+from materia.models import User, Directory, DirectoryPath, DirectoryInfo, FileSystem
 from materia.routers import middleware
 from materia.config import Config
 
+from pydantic import BaseModel
 
 router = APIRouter(tags=["directory"])
 
 
 @router.post("/directory")
 async def create(
-    path: Path = Path(),
-    user: User = Depends(middleware.user),
+    path: DirectoryPath,
+    repository=Depends(middleware.repository),
     ctx: middleware.Context = Depends(),
 ):
-    repository_path = Config.data_dir() / "repository" / user.lower_name
-    blacklist = [os.sep, ".", "..", "*"]
-    directory_path = Path(
-        os.sep.join(filter(lambda part: part not in blacklist, path.parts))
-    )
+    if not FileSystem.check_path(path.path):
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Invalid path")
+
+    path = FileSystem.normalize(path.path)
 
     async with ctx.database.session() as session:
-        session.add(user)
-        await session.refresh(user, attribute_names=["repository"])
+        current_directory = None
+        current_path = Path()
+        directory = None
 
-    if not user.repository:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
-
-    current_directory = None
-    current_path = Path()
-    directory = None
-
-    for part in directory_path.parts:
-        if not await Directory.by_path(
-            user.repository.id, current_path, part, ctx.database
-        ):
-            directory = Directory(
-                repository_id=user.repository.id,
-                parent_id=current_directory.id if current_directory else None,
-                name=part,
-            )
-
-            try:
-                (repository_path / current_path / part).mkdir(exist_ok=True)
-            except OSError:
-                raise HTTPException(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    f"Failed to create a directory {current_path / part}",
+        for part in path.parts:
+            if not (
+                directory := await Directory.by_path(
+                    repository, current_path.joinpath(part), session, ctx.config
                 )
+            ):
+                directory = await Directory(
+                    repository_id=repository.id,
+                    parent_id=current_directory.id if current_directory else None,
+                    name=part,
+                ).new(session, ctx.config)
 
-            async with ctx.database.session() as session:
-                session.add(directory)
-                await session.commit()
-                await session.refresh(directory)
+            current_directory = directory
+            current_path /= part
 
-        current_directory = directory
-        current_path /= part
+        await session.commit()
 
 
 @router.get("/directory")
 async def info(
     path: Path,
-    user: User = Depends(middleware.user),
+    repository=Depends(middleware.repository),
     ctx: middleware.Context = Depends(),
 ):
+    if not FileSystem.check_path(path):
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Invalid path")
+
+    path = FileSystem.normalize(path)
+    ctx.logger.info(path)
     async with ctx.database.session() as session:
-        session.add(user)
-        await session.refresh(user, attribute_names=["repository"])
-
-    if not user.repository:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
-
-    if not (
-        directory := await Directory.by_path(
-            user.repository.id,
-            None if path.parent == Path() else path.parent,
-            path.name,
-            ctx.database,
-        )
-    ):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Directory not found")
-
-    async with ctx.database.session() as session:
-        session.add(directory)
-        await session.refresh(directory, attribute_names=["files"])
-
-    info = DirectoryInfo.model_validate(directory)
-    info.used = sum([file.size for file in directory.files])
-
-    return info
+        if not (
+            directory := await Directory.by_path(
+                repository,
+                path,
+                session,
+                ctx.config,
+            )
+        ):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Directory not found")
+        ctx.logger.info(directory)
+        info = await directory.info(session)
+        ctx.logger.info(info)
+        return info
 
 
 @router.delete("/directory")
 async def remove(
     path: Path,
-    user: User = Depends(middleware.user),
+    repository=Depends(middleware.repository),
     ctx: middleware.Context = Depends(),
 ):
-    repository_path = Config.data_dir() / "repository" / user.lower_name
+    if not FileSystem.check_path(path):
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Invalid path")
+
+    path = FileSystem.normalize(path)
 
     async with ctx.database.session() as session:
-        session.add(user)
-        await session.refresh(user, attribute_names=["repository"])
+        if not (
+            directory := await Directory.by_path(
+                repository,
+                path,
+                session,
+                ctx.config,
+            )
+        ):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Directory not found")
 
-    if not user.repository:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
+        await directory.remove(session, ctx.config)
 
-    if not (
-        directory := await Directory.by_path(
-            user.repository.id,
-            None if path.parent == Path() else path.parent,
-            path.name,
-            ctx.database,
-        )
-    ):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Directory not found")
 
-    directory_path = repository_path / path
+@router.patch("/directory/rename")
+async def rename():
+    pass
 
-    try:
-        if directory_path.is_dir():
-            shutil.rmtree(str(directory_path))
-    except OSError:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to remove directory"
-        )
 
-    await directory.remove(ctx.database)
+@router.patch("/directory/move")
+async def move():
+    pass
+
+
+@router.post("/directory/copy")
+async def copy():
+    pass

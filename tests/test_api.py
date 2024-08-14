@@ -82,5 +82,44 @@ async def test_repository(auth_client: AsyncClient, api_config: Config):
     create = await auth_client.post("/api/repository")
     assert create.status_code == 409, create.text
 
+    assert api_config.application.working_directory.joinpath(
+        "repository", "PyTest".lower(), "default"
+    ).exists()
+
     info = await auth_client.get("/api/repository")
     assert info.status_code == 200, info.text
+
+    delete = await auth_client.delete("/api/repository")
+    assert delete.status_code == 200, delete.text
+
+    info = await auth_client.get("/api/repository")
+    assert info.status_code == 404, info.text
+
+    # TODO: content
+
+
+@pytest.mark.asyncio
+async def test_directory(auth_client: AsyncClient, api_config: Config):
+    create = await auth_client.post("/api/repository")
+    assert create.status_code == 200, create.text
+
+    create = await auth_client.post("/api/directory", json={"path": "first_dir"})
+    assert create.status_code == 500, create.text
+
+    create = await auth_client.post("/api/directory", json={"path": "/first_dir"})
+    assert create.status_code == 200, create.text
+
+    assert api_config.application.working_directory.joinpath(
+        "repository", "PyTest".lower(), "default", "first_dir"
+    ).exists()
+
+    info = await auth_client.get("/api/directory", params=[("path", "/first_dir")])
+    assert info.status_code == 200, info.text
+    assert info.json()["used"] == 0
+
+    delete = await auth_client.delete("/api/directory", params=[("path", "/first_dir")])
+    assert delete.status_code == 200, delete.text
+
+    assert not api_config.application.working_directory.joinpath(
+        "repository", "PyTest".lower(), "default", "first_dir"
+    ).exists()
