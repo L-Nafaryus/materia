@@ -35,7 +35,7 @@ class Repository(Base):
         session.add(self)
         await session.flush()
 
-        repository_path = await self.path(session, config)
+        repository_path = await self.real_path(session, config)
         relative_path = repository_path.relative_to(
             config.application.working_directory
         )
@@ -52,12 +52,13 @@ class Repository(Base):
 
         return self
 
-    async def path(self, session: SessionContext, config: Config) -> Path:
+    async def real_path(self, session: SessionContext, config: Config) -> Path:
+        """Get absolute path of the directory."""
         session.add(self)
         await session.refresh(self, attribute_names=["user"])
 
         repository_path = config.application.working_directory.joinpath(
-            "repository", self.user.lower_name, "default"
+            "repository", self.user.lower_name
         )
 
         return repository_path
@@ -73,7 +74,7 @@ class Repository(Base):
         for file in self.files:
             await file.remove(session)
 
-        repository_path = await self.path(session, config)
+        repository_path = await self.real_path(session, config)
 
         try:
             shutil.rmtree(str(repository_path))

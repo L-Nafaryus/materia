@@ -60,7 +60,7 @@ async def test_repository(data, tmpdir, session: SessionContext, config: Config)
 
     assert repository
     assert repository.id is not None
-    assert (await repository.path(session, config)).exists()
+    assert (await repository.real_path(session, config)).exists()
     assert await Repository.from_user(data.user, session) == repository
 
     await session.refresh(repository, attribute_names=["user"])
@@ -76,7 +76,7 @@ async def test_repository(data, tmpdir, session: SessionContext, config: Config)
     await session.flush()
     with pytest.raises(RepositoryError):
         await repository.remove(session, config)
-    assert not (await repository.path(session, config)).exists()
+    assert not (await repository.real_path(session, config)).exists()
 
 
 @pytest.mark.asyncio
@@ -107,7 +107,7 @@ async def test_directory(data, tmpdir, session: SessionContext, config: Config):
             )
         )
     ).first() == directory
-    assert (await directory.path(session, config)).exists()
+    assert (await directory.real_path(session, config)).exists()
 
     # nested simple
     nested_directory = await Directory(
@@ -128,7 +128,7 @@ async def test_directory(data, tmpdir, session: SessionContext, config: Config):
         )
     ).first() == nested_directory
     assert nested_directory.parent_id == directory.id
-    assert (await nested_directory.path(session, config)).exists()
+    assert (await nested_directory.real_path(session, config)).exists()
 
     # relationship
     await session.refresh(directory, attribute_names=["directories", "files"])
@@ -150,30 +150,34 @@ async def test_directory(data, tmpdir, session: SessionContext, config: Config):
     )
 
     # remove nested
-    nested_path = await nested_directory.path(session, config)
+    nested_path = await nested_directory.real_path(session, config)
     assert nested_path.exists()
     await nested_directory.remove(session, config)
     assert inspect(nested_directory).was_deleted
-    assert await nested_directory.path(session, config) is None
+    assert await nested_directory.real_path(session, config) is None
     assert not nested_path.exists()
 
     await session.refresh(directory)  # update attributes that was deleted
-    assert (await directory.path(session, config)).exists()
+    assert (await directory.real_path(session, config)).exists()
 
     # rename
-    assert (await directory.rename("test1", session, config)).name == "test1"
+    assert (
+        await directory.rename("test1", session, config, force=True)
+    ).name == "test1.1"
     await Directory(repository_id=repository.id, parent_id=None, name="test2").new(
         session, config
     )
-    assert (await directory.rename("test2", session, config)).name == "test2.1"
-    assert (await repository.path(session, config)).joinpath("test2.1").exists()
-    assert not (await repository.path(session, config)).joinpath("test1").exists()
+    assert (
+        await directory.rename("test2", session, config, force=True)
+    ).name == "test2.1"
+    assert (await repository.real_path(session, config)).joinpath("test2.1").exists()
+    assert not (await repository.real_path(session, config)).joinpath("test1").exists()
 
-    directory_path = await directory.path(session, config)
+    directory_path = await directory.real_path(session, config)
     assert directory_path.exists()
 
     await directory.remove(session, config)
-    assert await directory.path(session, config) is None
+    assert await directory.real_path(session, config) is None
     assert not directory_path.exists()
 
 
@@ -229,7 +233,7 @@ async def test_file(data, tmpdir, session: SessionContext, config: Config):
     )
 
     #
-    file_path = await file.path(session, config)
+    file_path = await file.real_path(session, config)
     assert file_path.exists()
     assert (await aiofiles.os.stat(file_path)).st_size == file.size
     async with aiofiles.open(file_path, mode="rb") as io:
@@ -238,21 +242,21 @@ async def test_file(data, tmpdir, session: SessionContext, config: Config):
 
     # rename
     assert (
-        await file.rename("test_file_rename.txt", session, config)
+        await file.rename("test_file_rename.txt", session, config, force=True)
     ).name == "test_file_rename.txt"
     await File(
         repository_id=repository.id, parent_id=directory.id, name="test_file_2.txt"
     ).new(b"", session, config)
     assert (
-        await file.rename("test_file_2.txt", session, config)
+        await file.rename("test_file_2.txt", session, config, force=True)
     ).name == "test_file_2.1.txt"
     assert (
-        (await repository.path(session, config))
+        (await repository.real_path(session, config))
         .joinpath("test1", "test_file_2.1.txt")
         .exists()
     )
     assert (
-        not (await repository.path(session, config))
+        not (await repository.real_path(session, config))
         .joinpath("test1", "test_file_rename.txt")
         .exists()
     )
@@ -262,12 +266,12 @@ async def test_file(data, tmpdir, session: SessionContext, config: Config):
     await session.refresh(file, attribute_names=["parent"])
     assert file.parent == directory2
     assert (
-        not (await repository.path(session, config))
+        not (await repository.real_path(session, config))
         .joinpath("test1", "test_file_2.1.txt")
         .exists()
     )
     assert (
-        (await repository.path(session, config))
+        (await repository.real_path(session, config))
         .joinpath("test2", "test_file_2.1.txt")
         .exists()
     )

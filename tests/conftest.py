@@ -21,6 +21,7 @@ from asgi_lifespan import LifespanManager
 from fastapi.middleware.cors import CORSMiddleware
 from materia import routers
 from pathlib import Path
+from copy import deepcopy
 
 
 @pytest_asyncio.fixture(scope="session")

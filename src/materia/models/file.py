@@ -47,9 +47,11 @@ class File(Base):
         await session.flush()
         await session.refresh(self, attribute_names=["repository"])
 
-        file_path = await self.path(session, config)
+        file_path = await self.real_path(session, config)
 
-        new_file = FileSystem(file_path, await self.repository.path(session, config))
+        new_file = FileSystem(
+            file_path, await self.repository.real_path(session, config)
+        )
         await new_file.write_file(data)
 
         self.size = await new_file.size()
@@ -60,9 +62,11 @@ class File(Base):
     async def remove(self, session: SessionContext, config: Config):
         session.add(self)
 
-        file_path = await self.path(session, config)
+        file_path = await self.real_path(session, config)
 
-        new_file = FileSystem(file_path, await self.repository.path(session, config))
+        new_file = FileSystem(
+            file_path, await self.repository.real_path(session, config)
+        )
         await new_file.remove()
 
         await session.delete(self)
@@ -83,7 +87,9 @@ class File(Base):
 
         return file_path.joinpath(self.name)
 
-    async def path(self, session: SessionContext, config: Config) -> Optional[Path]:
+    async def real_path(
+        self, session: SessionContext, config: Config
+    ) -> Optional[Path]:
         if inspect(self).was_deleted:
             return None
 
@@ -94,9 +100,9 @@ class File(Base):
             await session.refresh(self, attribute_names=["repository", "parent"])
 
             if self.parent:
-                file_path = await self.parent.path(session, config)
+                file_path = await self.parent.real_path(session, config)
             else:
-                file_path = await self.repository.path(session, config)
+                file_path = await self.repository.real_path(session, config)
 
         return file_path.joinpath(self.name)
 
@@ -130,19 +136,24 @@ class File(Base):
         return current_file
 
     async def copy(
-        self, directory: Optional["Directory"], session: SessionContext, config: Config
+        self,
+        directory: Optional["Directory"],
+        session: SessionContext,
+        config: Config,
+        force: bool = False,
+        shallow: bool = False,
     ) -> Self:
         session.add(self)
         await session.refresh(self, attribute_names=["repository"])
 
-        repository_path = await self.repository.path(session, config)
-        file_path = await self.path(session, config)
+        repository_path = await self.repository.real_path(session, config)
+        file_path = await self.real_path(session, config)
         directory_path = (
-            await directory.path(session, config) if directory else repository_path
+            await directory.real_path(session, config) if directory else repository_path
         )
 
         current_file = FileSystem(file_path, repository_path)
-        new_file = await current_file.copy(directory_path)
+        new_file = await current_file.copy(directory_path, force=force, shallow=shallow)
 
         cloned = self.clone()
         cloned.name = new_file.name()
@@ -153,19 +164,26 @@ class File(Base):
         return self
 
     async def move(
-        self, directory: Optional["Directory"], session: SessionContext, config: Config
+        self,
+        directory: Optional["Directory"],
+        session: SessionContext,
+        config: Config,
+        force: bool = False,
+        shallow: bool = False,
     ) -> Self:
         session.add(self)
         await session.refresh(self, attribute_names=["repository"])
 
-        repository_path = await self.repository.path(session, config)
-        file_path = await self.path(session, config)
+        repository_path = await self.repository.real_path(session, config)
+        file_path = await self.real_path(session, config)
         directory_path = (
-            await directory.path(session, config) if directory else repository_path
+            await directory.real_path(session, config) if directory else repository_path
         )
 
         current_file = FileSystem(file_path, repository_path)
-        moved_file = await current_file.move(directory_path)
+        moved_file = await current_file.move(
+            directory_path, force=force, shallow=shallow
+        )
 
         self.name = moved_file.name()
         self.parent_id = directory.id if directory else None
@@ -174,15 +192,22 @@ class File(Base):
 
         return self
 
-    async def rename(self, name: str, session: SessionContext, config: Config) -> Self:
+    async def rename(
+        self,
+        name: str,
+        session: SessionContext,
+        config: Config,
+        force: bool = False,
+        shallow: bool = False,
+    ) -> Self:
         session.add(self)
         await session.refresh(self, attribute_names=["repository"])
 
-        repository_path = await self.repository.path(session, config)
-        file_path = await self.path(session, config)
+        repository_path = await self.repository.real_path(session, config)
+        file_path = await self.real_path(session, config)
 
         current_file = FileSystem(file_path, repository_path)
-        renamed_file = await current_file.rename(name, force=True)
+        renamed_file = await current_file.rename(name, force=force, shallow=shallow)
 
         self.name = renamed_file.name()
         self.updated = time()
@@ -224,6 +249,22 @@ class FileInfo(BaseModel):
     name: str
     is_public: bool
     size: int
+
+
+class FilePath(BaseModel):
+    path: Path
+
+
+class FileRename(BaseModel):
+    path: Path
+    name: str
+    force: Optional[bool] = False
+
+
+class FileCopyMove(BaseModel):
+    path: Path
+    target: Path
+    force: Optional[bool] = False
 
 
 from materia.models.repository import Repository

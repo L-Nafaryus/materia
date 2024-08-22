@@ -48,8 +48,8 @@ class Directory(Base):
         await session.flush()
         await session.refresh(self, attribute_names=["repository"])
 
-        repository_path = await self.repository.path(session, config)
-        directory_path = await self.path(session, config)
+        repository_path = await self.repository.real_path(session, config)
+        directory_path = await self.real_path(session, config)
 
         new_directory = FileSystem(directory_path, repository_path)
         await new_directory.make_directory()
@@ -70,8 +70,8 @@ class Directory(Base):
             for file in self.files:
                 file.remove(session, config)
 
-        repository_path = await self.repository.path(session, config)
-        directory_path = await self.path(session, config)
+        repository_path = await self.repository.real_path(session, config)
+        directory_path = await self.real_path(session, config)
 
         current_directory = FileSystem(directory_path, repository_path)
         await current_directory.remove()
@@ -80,32 +80,45 @@ class Directory(Base):
         await session.flush()
 
     async def relative_path(self, session: SessionContext) -> Optional[Path]:
-        """Get relative path of the current directory"""
+        """Get path of the directory relative repository root."""
         if inspect(self).was_deleted:
             return None
 
         parts = []
         current_directory = self
 
-        async with session.begin_nested():
-            while True:
-                parts.append(current_directory.name)
+        while True:
+            # ISSUE: accessing `parent` attribute raises greenlet_spawn has not been called; can't call await_only() here
+            # parts.append(current_directory.name)
+            # session.add(current_directory)
+            # await session.refresh(current_directory, attribute_names=["parent"])
+            # if current_directory.parent is None:
+            #    break
+            # current_directory = current_directory.parent
 
-                session.add(current_directory)
-                await session.refresh(current_directory, attribute_names=["parent"])
+            parts.append(current_directory.name)
 
-                if current_directory.parent is None:
-                    break
+            if current_directory.parent_id is None:
+                break
 
-                current_directory = current_directory.parent
+            current_directory = (
+                await session.scalars(
+                    sa.select(Directory).where(
+                        Directory.id == current_directory.parent_id,
+                    )
+                )
+            ).first()
 
         return Path().joinpath(*reversed(parts))
 
-    async def path(self, session: SessionContext, config: Config) -> Optional[Path]:
+    async def real_path(
+        self, session: SessionContext, config: Config
+    ) -> Optional[Path]:
+        """Get absolute path of the directory"""
         if inspect(self).was_deleted:
             return None
 
-        repository_path = await self.repository.path(session, config)
+        repository_path = await self.repository.real_path(session, config)
         relative_path = await self.relative_path(session)
 
         return repository_path.joinpath(relative_path)
@@ -123,6 +136,7 @@ class Directory(Base):
         current_directory: Optional[Directory] = None
 
         for part in path.parts:
+            # from root directory to target directory
             current_directory = (
                 await session.scalars(
                     sa.select(Directory).where(
@@ -145,75 +159,106 @@ class Directory(Base):
         return current_directory
 
     async def copy(
-        self, directory: Optional["Directory"], session: SessionContext, config: Config
+        self,
+        target: Optional["Directory"],
+        session: SessionContext,
+        config: Config,
+        force: bool = False,
+        shallow: bool = False,
     ) -> Self:
         session.add(self)
         await session.refresh(self, attribute_names=["repository"])
 
-        repository_path = await self.repository.path(session, config)
-        directory_path = await self.path(session, config)
-        directory_path = (
-            await directory.path(session, config) if directory else repository_path
+        repository_path = await self.repository.real_path(session, config)
+        directory_path = await self.real_path(session, config)
+        target_path = (
+            await target.real_path(session, config) if target else repository_path
         )
 
         current_directory = FileSystem(directory_path, repository_path)
-        new_directory = await current_directory.copy(directory_path)
+        new_directory = await current_directory.copy(
+            target_path, force=force, shallow=shallow
+        )
 
         cloned = self.clone()
         cloned.name = new_directory.name()
-        cloned.parent_id = directory.id if directory else None
+        cloned.parent_id = target.id if target else None
         session.add(cloned)
         await session.flush()
+
+        await session.refresh(self, attribute_names=["files", "directories"])
+        for directory in self.directories:
+            await directory.copy(cloned, session, config, shallow=True)
+        for file in self.files:
+            await file.copy(cloned, session, config, shallow=True)
 
         return self
 
     async def move(
-        self, directory: Optional["Directory"], session: SessionContext, config: Config
+        self,
+        target: Optional["Directory"],
+        session: SessionContext,
+        config: Config,
+        force: bool = False,
+        shallow: bool = False,
     ) -> Self:
         session.add(self)
         await session.refresh(self, attribute_names=["repository"])
 
-        repository_path = await self.repository.path(session, config)
-        directory_path = await self.path(session, config)
-        directory_path = (
-            await directory.path(session, config) if directory else repository_path
+        repository_path = await self.repository.real_path(session, config)
+        directory_path = await self.real_path(session, config)
+        target_path = (
+            await target.real_path(session, config) if target else repository_path
         )
 
         current_directory = FileSystem(directory_path, repository_path)
-        moved_directory = await current_directory.move(directory_path)
+        moved_directory = await current_directory.move(
+            target_path, force=force, shallow=shallow
+        )
 
         self.name = moved_directory.name()
-        self.parent_id = directory.id if directory else None
+        self.parent_id = target.id if target else None
         self.updated = time()
+
         await session.flush()
 
         return self
 
-    async def rename(self, name: str, session: SessionContext, config: Config) -> Self:
+    async def rename(
+        self,
+        name: str,
+        session: SessionContext,
+        config: Config,
+        force: bool = False,
+        shallow: bool = False,
+    ) -> Self:
         session.add(self)
         await session.refresh(self, attribute_names=["repository"])
 
-        repository_path = await self.repository.path(session, config)
-        directory_path = await self.path(session, config)
+        repository_path = await self.repository.real_path(session, config)
+        directory_path = await self.real_path(session, config)
 
         current_directory = FileSystem(directory_path, repository_path)
-        renamed_directory = await current_directory.rename(name, force=True)
+        renamed_directory = await current_directory.rename(
+            name, force=force, shallow=shallow
+        )
 
         self.name = renamed_directory.name()
         await session.flush()
         return self
 
     async def info(self, session: SessionContext) -> "DirectoryInfo":
-        info = DirectoryInfo.model_validate(self)
         session.add(self)
         await session.refresh(self, attribute_names=["files"])
+
+        info = DirectoryInfo.model_validate(self)
+
+        relative_path = await self.relative_path(session)
+
+        info.path = Path("/").joinpath(relative_path) if relative_path else None
         info.used = sum([file.size for file in self.files])
 
         return info
-
-
-class DirectoryPath(BaseModel):
-    path: Path
 
 
 class DirectoryLink(Base):
@@ -240,7 +285,24 @@ class DirectoryInfo(BaseModel):
     name: str
     is_public: bool
 
+    path: Optional[Path] = None
     used: Optional[int] = None
+
+
+class DirectoryPath(BaseModel):
+    path: Path
+
+
+class DirectoryRename(BaseModel):
+    path: Path
+    name: str
+    force: Optional[bool] = False
+
+
+class DirectoryCopyMove(BaseModel):
+    path: Path
+    target: Path
+    force: Optional[bool] = False
 
 
 from materia.models.repository import Repository

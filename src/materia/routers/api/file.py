@@ -3,140 +3,141 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile
 
-from materia.models import User, File, FileInfo, Directory
+from materia.models import (
+    User,
+    File,
+    FileInfo,
+    Directory,
+    DirectoryPath,
+    Repository,
+    FileSystem,
+    FileRename,
+    FilePath,
+    FileCopyMove,
+)
+from materia.models.database import SessionContext
 from materia.routers import middleware
 from materia.config import Config
-
+from materia.routers.api.directory import validate_target_directory
 
 router = APIRouter(tags=["file"])
 
 
+async def validate_current_file(
+    path: Path, repository: Repository, session: SessionContext, config: Config
+) -> Directory:
+    if not FileSystem.check_path(path):
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Invalid path")
+
+    if not (
+        file := await File.by_path(
+            repository,
+            FileSystem.normalize(path),
+            session,
+            config,
+        )
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
+
+    return file
+
+
 @router.post("/file")
 async def create(
-    upload_file: UploadFile,
-    path: Path = Path(),
-    user: User = Depends(middleware.user),
+    file: UploadFile,
+    path: DirectoryPath,
+    repository: Repository = Depends(middleware.repository),
     ctx: middleware.Context = Depends(),
 ):
-    if not upload_file.filename:
+    if not file.filename:
         raise HTTPException(
             status.HTTP_417_EXPECTATION_FAILED, "Cannot upload file without name"
         )
-
-    repository_path = Config.data_dir() / "repository" / user.lower_name
-    blacklist = [os.sep, ".", "..", "*"]
-    directory_path = Path(
-        os.sep.join(filter(lambda part: part not in blacklist, path.parts))
-    )
+    if not FileSystem.check_path(path.path):
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Invalid path")
 
     async with ctx.database.session() as session:
-        session.add(user)
-        await session.refresh(user, attribute_names=["repository"])
-
-    if not user.repository:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
-
-    if not directory_path == Path():
-        directory = await Directory.by_path(
-            user.repository.id,
-            None if directory_path.parent == Path() else directory_path.parent,
-            directory_path.name,
-            ctx.database,
+        target_directory = await validate_target_directory(
+            path.path, repository, session, ctx.config
         )
 
-        if not directory:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Directory not found")
-    else:
-        directory = None
+        await File(
+            repository_id=repository.id,
+            parent_id=target_directory.id if target_directory else None,
+            name=file.filename,
+            size=file.size,
+        ).new(await file.read(), session, ctx.config)
 
-    file = File(
-        repository_id=user.repository.id,
-        parent_id=directory.id if directory else None,
-        name=upload_file.filename,
-        path=None if directory_path == Path() else str(directory_path),
-        size=upload_file.size,
-    )
-
-    try:
-        file_path = repository_path.joinpath(directory_path, upload_file.filename)
-
-        if file_path.exists():
-            raise HTTPException(
-                status.HTTP_409_CONFLICT, "File with given name already exists"
-            )
-
-        file_path.write_bytes(await upload_file.read())
-    except OSError:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to write a file"
-        )
-
-    async with ctx.database.session() as session:
-        session.add(file)
         await session.commit()
 
 
 @router.get("/file")
 async def info(
     path: Path,
-    user: User = Depends(middleware.user),
+    repository: Repository = Depends(middleware.repository),
     ctx: middleware.Context = Depends(),
 ):
     async with ctx.database.session() as session:
-        session.add(user)
-        await session.refresh(user, attribute_names=["repository"])
+        file = await validate_current_file(path, repository, session, ctx.config)
 
-    if not user.repository:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
+        info = await file.info(session)
 
-    if not (
-        file := await File.by_path(
-            user.repository.id,
-            None if path.parent == Path() else path.parent,
-            path.name,
-            ctx.database,
-        )
-    ):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
-
-    info = FileInfo.model_validate(file)
-
-    return info
+        return info
 
 
 @router.delete("/file")
 async def remove(
     path: Path,
-    user: User = Depends(middleware.user),
+    repository: Repository = Depends(middleware.repository),
     ctx: middleware.Context = Depends(),
 ):
     async with ctx.database.session() as session:
-        session.add(user)
-        await session.refresh(user, attribute_names=["repository"])
+        file = await validate_current_file(path, repository, session, ctx.config)
 
-    if not user.repository:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repository not found")
+        await file.remove(session, ctx.config)
+        await session.commit()
 
-    if not (
-        file := await File.by_path(
-            user.repository.id,
-            None if path.parent == Path() else path.parent,
-            path.name,
-            ctx.database,
+
+@router.patch("/file/rename")
+async def rename(
+    data: FileRename,
+    repository: Repository = Depends(middleware.repository),
+    ctx: middleware.Context = Depends(),
+):
+    async with ctx.database.session() as session:
+        file = await validate_current_file(data.path, repository, session, ctx.config)
+
+        await file.rename(data.name, session, ctx.config, force=data.force)
+        await session.commit()
+
+
+@router.patch("/file/move")
+async def move(
+    data: FileCopyMove,
+    repository: Repository = Depends(middleware.repository),
+    ctx: middleware.Context = Depends(),
+):
+    async with ctx.database.session() as session:
+        file = await validate_current_file(data.path, repository, session, ctx.config)
+        target_directory = await validate_target_directory(
+            data.target, repository, session, ctx.config
         )
-    ):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
 
-    repository_path = Config.data_dir() / "repository" / user.lower_name
+        await file.move(target_directory, session, ctx.config, force=data.force)
+        await session.commit()
 
-    try:
-        file_path = repository_path.joinpath(path)
 
-        if file_path.exists():
-            file_path.unlink(missing_ok=True)
-    except OSError:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to remove a file"
+@router.post("/file/copy")
+async def copy(
+    data: FileCopyMove,
+    repository: Repository = Depends(middleware.repository),
+    ctx: middleware.Context = Depends(),
+):
+    async with ctx.database.session() as session:
+        file = await validate_current_file(data.path, repository, session, ctx.config)
+        target_directory = await validate_target_directory(
+            data.target, repository, session, ctx.config
         )
 
-    await file.remove(ctx.database)
+        await file.copy(target_directory, session, ctx.config, force=data.force)
+        await session.commit()

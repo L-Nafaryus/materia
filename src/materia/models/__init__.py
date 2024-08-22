@@ -12,6 +12,7 @@ from materia.models.database import (
     DatabaseMigrationError,
     Cache,
     CacheError,
+    SessionContext,
 )
 
 from materia.models.user import User, UserCredentials, UserInfo
@@ -27,9 +28,18 @@ from materia.models.repository import (
 
 from materia.models.directory import (
     Directory,
-    DirectoryPath,
     DirectoryLink,
     DirectoryInfo,
+    DirectoryPath,
+    DirectoryRename,
+    DirectoryCopyMove,
 )
 
-from materia.models.file import File, FileLink, FileInfo
+from materia.models.file import (
+    File,
+    FileLink,
+    FileInfo,
+    FilePath,
+    FileRename,
+    FileCopyMove,
+)

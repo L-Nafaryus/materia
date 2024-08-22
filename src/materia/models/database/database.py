@@ -107,7 +107,7 @@ class Database:
             raise e from None
         except Exception as e:
             await session.rollback()
-            raise DatabaseError(*e.args) from e
+            raise e  # DatabaseError(*e.args) from e
         finally:
             await session.close()
 

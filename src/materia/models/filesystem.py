@@ -59,7 +59,7 @@ class FileSystem:
 
         except OSError as e:
             raise FileSystemError(
-                f"Failed to remove file system content at /{self.relative_path}:",
+                f"Failed to remove content at /{self.relative_path}:",
                 *e.args,
             )
 
@@ -67,9 +67,6 @@ class FileSystem:
         """Generate name based on target directory contents and self type."""
         count = 1
         new_path = target_directory.joinpath(name)
-
-        if new_path == self.path:
-            return name
 
         while await async_path.exists(new_path):
             if await self.is_file():
@@ -94,27 +91,42 @@ class FileSystem:
 
         return new_path.name
 
+    async def _generate_new_path(
+        self,
+        target_directory: Path,
+        new_name: Optional[str] = None,
+        force: bool = False,
+        shallow: bool = False,
+    ) -> Path:
+        if self.path == self.working_directory:
+            raise FileSystemError("Cannot modify working directory")
+
+        new_name = new_name or self.path.name
+
+        if await async_path.exists(target_directory.joinpath(new_name)) and not shallow:
+            if force:
+                new_name = await self.generate_name(target_directory, new_name)
+            else:
+                raise FileSystemError(
+                    f"Target destination already exists /{target_directory.joinpath(new_name)}"
+                )
+
+        return target_directory.joinpath(new_name)
+
     async def move(
         self,
         target_directory: Path,
         new_name: Optional[str] = None,
         force: bool = False,
+        shallow: bool = False,
     ):
-        new_name = new_name if new_name else self.path.name
+        new_path = await self._generate_new_path(
+            target_directory, new_name, force=force, shallow=shallow
+        )
 
         try:
-            if (
-                await async_path.exists(target_directory.joinpath(new_name))
-                and not force
-            ):
-                raise FileSystemError(
-                    "Failed to move content to target destination: already exists"
-                )
-
-            new_path = target_directory.joinpath(
-                await self.generate_name(target_directory, new_name)
-            )
-            await aioshutil.move(self.path, new_path)
+            if not shallow:
+                await aioshutil.move(self.path, new_path)
 
         except Exception as e:
             raise FileSystemError(
@@ -124,39 +136,35 @@ class FileSystem:
 
         return FileSystem(new_path, self.working_directory)
 
-    async def rename(self, new_name: str, force: bool = False) -> Path:
-        return await self.move(self.path.parent, new_name=new_name, force=force)
+    async def rename(
+        self, new_name: str, force: bool = False, shallow: bool = False
+    ) -> Path:
+        return await self.move(
+            self.path.parent, new_name=new_name, force=force, shallow=shallow
+        )
 
     async def copy(
         self,
         target_directory: Path,
         new_name: Optional[str] = None,
         force: bool = False,
+        shallow: bool = False,
     ) -> Self:
-        new_name = new_name if new_name else self.path.name
+        new_path = await self._generate_new_path(
+            target_directory, new_name, force=force, shallow=shallow
+        )
 
         try:
-            if (
-                await async_path.exists(target_directory.joinpath(new_name))
-                and not force
-            ):
-                raise FileSystemError(
-                    "Failed to copy content to target destination: already exists"
-                )
+            if not shallow:
+                if await self.is_file():
+                    await aioshutil.copy(self.path, new_path)
 
-            new_path = target_directory.joinpath(
-                await self.generate_name(target_directory, new_name)
-            )
-
-            if await self.is_file():
-                await aioshutil.copy(self.path, new_path)
-
-            if await self.is_directory():
-                await aioshutil.copytree(self.path, new_path)
+                if await self.is_directory():
+                    await aioshutil.copytree(self.path, new_path)
 
         except Exception as e:
             raise FileSystemError(
-                f"Failed to copy content from /{self.relative_path}:",
+                f"Failed to copy content from /{new_path}:",
                 *e.args,
             )
 
@@ -193,6 +201,7 @@ class FileSystem:
 
     @staticmethod
     def normalize(path: Path) -> Path:
+        """Resolve path and make it relative."""
         if not path.is_absolute():
             path = Path("/").joinpath(path)
 
