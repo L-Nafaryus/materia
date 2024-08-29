@@ -1,13 +1,6 @@
 import uuid
 import io
-import shutil
-
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile
-import sqlalchemy as sa
-from sqids.sqids import Sqids
-from PIL import Image
-
-from materia.config import Config
 from materia.models import User, UserInfo
 from materia.routers import middleware
 

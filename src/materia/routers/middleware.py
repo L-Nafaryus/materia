@@ -1,8 +1,8 @@
-from typing import Optional, Sequence
+from typing import Optional
 import uuid
 from datetime import datetime
 from pathlib import Path
-from fastapi import HTTPException, Request, Response, status, Depends, Cookie
+from fastapi import HTTPException, Request, Response, status, Depends
 from fastapi.security.base import SecurityBase
 import jwt
 from sqlalchemy import select

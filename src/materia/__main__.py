@@ -1,3 +1,3 @@
-from materia.main import main
+from materia.app import cli
 
-main()
+cli()

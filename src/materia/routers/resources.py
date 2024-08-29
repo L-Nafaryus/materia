@@ -5,7 +5,7 @@ from pathlib import Path
 import mimetypes
 
 from materia.routers import middleware
-from materia.config import Config
+from materia.core import Config
 
 router = APIRouter(tags=["resources"], prefix="/resources")
 

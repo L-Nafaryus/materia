@@ -4,8 +4,7 @@ import time
 import re
 
 from pydantic import BaseModel, EmailStr, ConfigDict
-import pydantic
-from sqlalchemy import BigInteger, Enum
+from sqlalchemy import BigInteger
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 import sqlalchemy as sa
 from PIL import Image
@@ -15,10 +14,7 @@ from aiofiles import os as async_os
 from materia import security
 from materia.models.base import Base
 from materia.models.auth.source import LoginType
-from materia.models import database
-from materia.models.database import SessionContext
-from materia.config import Config
-from loguru import logger
+from materia.core import SessionContext, Config, FileSystem
 
 valid_username = re.compile(r"^[\da-zA-Z][-.\w]*$")
 invalid_username = re.compile(r"[-._]{2,}|[-._]$")
@@ -230,4 +226,3 @@ class UserInfo(BaseModel):
 
 
 from materia.models.repository import Repository
-from materia.models.filesystem import FileSystem

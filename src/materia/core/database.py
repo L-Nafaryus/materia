@@ -1,9 +1,8 @@
 from contextlib import asynccontextmanager
-import os
 from typing import AsyncIterator, Self, TypeAlias
 from pathlib import Path
 
-from pydantic import BaseModel, PostgresDsn, ValidationError
+from pydantic import PostgresDsn, ValidationError
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncEngine,
@@ -19,11 +18,7 @@ from alembic.runtime.migration import MigrationContext
 from alembic.script.base import ScriptDirectory
 import alembic_postgresql_enum
 from fastapi import HTTPException
-
-from materia.config import Config
-from materia.models.base import Base
-
-__all__ = ["Database"]
+from materia.core.logging import Logger
 
 
 class DatabaseError(Exception):
@@ -77,6 +72,8 @@ class Database:
 
         if test_connection:
             try:
+                if logger := Logger.instance():
+                    logger.debug("Testing database connection")
                 async with database.connection() as connection:
                     await connection.rollback()
             except Exception as e:
@@ -112,10 +109,13 @@ class Database:
             await session.close()
 
     def run_sync_migrations(self, connection: Connection):
+        from materia.models.base import Base
+
         aconfig = AlembicConfig()
         aconfig.set_main_option("sqlalchemy.url", str(self.url))
         aconfig.set_main_option(
-            "script_location", str(Path(__file__).parent.parent.joinpath("migrations"))
+            "script_location",
+            str(Path(__file__).parent.parent.joinpath("models", "migrations")),
         )
 
         context = MigrationContext.configure(
@@ -140,10 +140,13 @@ class Database:
             await connection.run_sync(self.run_sync_migrations)  # type: ignore
 
     def rollback_sync_migrations(self, connection: Connection):
+        from materia.models.base import Base
+
         aconfig = AlembicConfig()
         aconfig.set_main_option("sqlalchemy.url", str(self.url))
         aconfig.set_main_option(
-            "script_location", str(Path(__file__).parent.parent.joinpath("migrations"))
+            "script_location",
+            str(Path(__file__).parent.parent.joinpath("models", "migrations")),
         )
 
         context = MigrationContext.configure(

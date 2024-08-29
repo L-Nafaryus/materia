@@ -1,9 +1,5 @@
-import os
 from pathlib import Path
-import shutil
-
 from fastapi import APIRouter, Depends, HTTPException, status
-
 from materia.models import (
     User,
     Directory,
@@ -11,14 +7,10 @@ from materia.models import (
     DirectoryPath,
     DirectoryRename,
     DirectoryCopyMove,
-    FileSystem,
     Repository,
 )
-from materia.models.database import SessionContext
+from materia.core import SessionContext, Config, FileSystem
 from materia.routers import middleware
-from materia.config import Config
-
-from pydantic import BaseModel
 
 router = APIRouter(tags=["directory"])
 

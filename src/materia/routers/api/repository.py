@@ -1,7 +1,4 @@
-import shutil
-from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
-
 from materia.models import (
     User,
     Repository,
@@ -11,7 +8,6 @@ from materia.models import (
     DirectoryInfo,
 )
 from materia.routers import middleware
-from materia.config import Config
 
 
 router = APIRouter(tags=["repository"])

@@ -1,15 +1,9 @@
 from os import environ
 from pathlib import Path
-import sys
-from typing import Any, Literal, Optional, Self, Union
-
+from typing import Literal, Optional, Self, Union
 from pydantic import (
     BaseModel,
     Field,
-    HttpUrl,
-    model_validator,
-    TypeAdapter,
-    PostgresDsn,
     NameEmail,
 )
 from pydantic_settings import BaseSettings
@@ -149,11 +143,11 @@ class Mailer(BaseModel):
 
 
 class Cron(BaseModel):
-    pass
+    workers_count: int = 1
 
 
 class Repository(BaseModel):
-    capacity: int = 41943040
+    capacity: int = 5 << 30
 
 
 class Config(BaseSettings, env_prefix="materia_", env_nested_delimiter="_"):

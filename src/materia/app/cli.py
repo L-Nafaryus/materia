@@ -1,55 +1,22 @@
-from contextlib import _AsyncGeneratorContextManager, asynccontextmanager
-from os import environ
-import os
 from pathlib import Path
-import pwd
 import sys
-from typing import AsyncIterator, TypedDict
 import click
-
-from pydantic import BaseModel
-from pydanclick import from_pydantic
-import pydantic
-import uvicorn
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from materia import config as _config
-from materia.config import Config
-from materia._logging import make_logger, uvicorn_log_config, Logger
-from materia.models import Database, DatabaseError, Cache
-from materia import routers
-from materia.app import make_application
+from materia.core.config import Config
+from materia.core.logging import Logger
+from materia.app import Application
+import asyncio
 
 
 @click.group()
-def main():
+def cli():
     pass
 
 
-@main.command()
-@click.option("--config_path", type=Path)
-@from_pydantic("application", _config.Application, prefix="app")
-@from_pydantic("log", _config.Log, prefix="log")
-def start(application: _config.Application, config_path: Path, log: _config.Log):
-    config = Config()
-    config.log = log
-    logger = make_logger(config)
-
-    # if user := application.user:
-    #    os.setuid(pwd.getpwnam(user).pw_uid)
-    # if group := application.group:
-    #    os.setgid(pwd.getpwnam(user).pw_gid)
-    # TODO: merge cli options with config
-    if working_directory := (
-        application.working_directory or config.application.working_directory
-    ).resolve():
-        try:
-            os.chdir(working_directory)
-        except FileNotFoundError as e:
-            logger.error("Failed to change working directory: {}", e)
-            sys.exit()
-    logger.debug(f"Current working directory: {working_directory}")
+@cli.command()
+@click.option("--config", type=Path)
+def start(config: Path):
+    config_path = config
+    logger = Logger.new()
 
     # check the configuration file or use default
     if config_path is not None:
@@ -80,31 +47,14 @@ def start(application: _config.Application, config_path: Path, log: _config.Log)
             logger.info("Using the default configuration.")
             config = Config()
 
-    config.log.level = log.level
-    logger = make_logger(config)
-    if working_directory := config.application.working_directory.resolve():
-        logger.debug(f"Change working directory: {working_directory}")
-        try:
-            os.chdir(working_directory)
-        except FileNotFoundError as e:
-            logger.error("Failed to change working directory: {}", e)
-            sys.exit()
+    async def main():
+        app = await Application.new(config)
+        await app.start()
 
-    config.application.mode = application.mode
-
-    try:
-        uvicorn.run(
-            make_application(config, logger),
-            port=config.server.port,
-            host=str(config.server.address),
-            # reload = config.application.mode == "development",
-            log_config=uvicorn_log_config(config),
-        )
-    except (KeyboardInterrupt, SystemExit):
-        pass
+    asyncio.run(main())
 
 
-@main.group()
+@cli.group()
 def config():
     pass
 
@@ -123,7 +73,7 @@ def config():
 def config_create(path: Path, force: bool):
     path = path.resolve()
     config = Config()
-    logger = make_logger(config)
+    logger = Logger.new()
 
     if path.exists() and not force:
         logger.warning("File already exists at the given path. Exit.")
@@ -148,8 +98,7 @@ def config_create(path: Path, force: bool):
 )
 def config_check(path: Path):
     path = path.resolve()
-    config = Config()
-    logger = make_logger(config)
+    logger = Logger.new()
 
     if not path.exists():
         logger.error("Configuration file was not found at the given path. Exit.")
@@ -164,4 +113,4 @@ def config_check(path: Path):
 
 
 if __name__ == "__main__":
-    main()
+    cli()

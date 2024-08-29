@@ -36,6 +36,8 @@ dependencies = [
     "jinja2>=3.1.4",
     "aiofiles>=24.1.0",
     "aioshutil>=1.5",
+    "Celery>=5.4.0",
+    "streaming-form-data>=1.16.0",
 ]
 requires-python = ">=3.12,<3.13"
 readme = "README.md"

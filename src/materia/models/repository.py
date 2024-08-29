@@ -1,19 +1,15 @@
-from time import time
 from typing import List, Self, Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 from pathlib import Path
 import shutil
 
-from sqlalchemy import BigInteger, ForeignKey, inspect
+from sqlalchemy import BigInteger, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
-from sqlalchemy.orm.attributes import InstrumentedAttribute
 import sqlalchemy as sa
 from pydantic import BaseModel, ConfigDict
 
 from materia.models.base import Base
-from materia.models import database
-from materia.models.database import SessionContext
-from materia.config import Config
+from materia.core import SessionContext, Config
 
 
 class RepositoryError(Exception):
@@ -99,12 +95,19 @@ class Repository(Base):
         await session.refresh(user, attribute_names=["repository"])
         return user.repository
 
-    async def info(self, session: SessionContext) -> "RepositoryInfo":
+    async def used(self, session: SessionContext) -> int:
         session.add(self)
         await session.refresh(self, attribute_names=["files"])
 
+        return sum([file.size for file in self.files])
+
+    async def remaining_capacity(self, session: SessionContext) -> int:
+        used = await self.used(session)
+        return self.capacity - used
+
+    async def info(self, session: SessionContext) -> "RepositoryInfo":
         info = RepositoryInfo.model_validate(self)
-        info.used = sum([file.size for file in self.files])
+        info.used = await self.used(session)
 
         return info
 

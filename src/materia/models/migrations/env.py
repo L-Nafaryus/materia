@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 import alembic_postgresql_enum
 
-from materia.config import Config
+from materia.core import Config
 from materia.models.base import Base
 import materia.models.user
 import materia.models.auth
@@ -22,12 +22,12 @@ import materia.models.file
 
 config = context.config
 
-#config.set_main_option("sqlalchemy.url", Config().database.url())
+# config.set_main_option("sqlalchemy.url", Config().database.url())
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name, disable_existing_loggers = False)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -61,7 +61,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        version_table_schema = "public"
+        version_table_schema="public",
     )
 
     with context.begin_transaction():

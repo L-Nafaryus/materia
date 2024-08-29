@@ -1,1 +1,2 @@
-from materia.app.app import AppContext, make_lifespan, make_application
+from materia.app.app import Context, Application
+from materia.app.cli import cli

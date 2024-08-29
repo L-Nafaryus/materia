@@ -1,19 +1,14 @@
 from time import time
-from typing import Optional, Self
+from typing import Optional, Self, Union
 from pathlib import Path
-import aioshutil
 
 from sqlalchemy import BigInteger, ForeignKey, inspect
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 import sqlalchemy as sa
 from pydantic import BaseModel, ConfigDict
-import aiofiles
-import aiofiles.os
 
 from materia.models.base import Base
-from materia.models import database
-from materia.models.database import SessionContext
-from materia.config import Config
+from materia.core import SessionContext, Config, FileSystem
 
 
 class FileError(Exception):
@@ -41,18 +36,23 @@ class File(Base):
     link: Mapped["FileLink"] = relationship(back_populates="file")
 
     async def new(
-        self, data: bytes, session: SessionContext, config: Config
+        self, data: Union[bytes, Path], session: SessionContext, config: Config
     ) -> Optional[Self]:
         session.add(self)
         await session.flush()
         await session.refresh(self, attribute_names=["repository"])
 
         file_path = await self.real_path(session, config)
+        repository_path = await self.repository.real_path(session, config)
+        new_file = FileSystem(file_path, repository_path)
 
-        new_file = FileSystem(
-            file_path, await self.repository.real_path(session, config)
-        )
-        await new_file.write_file(data)
+        if isinstance(data, bytes):
+            await new_file.write_file(data)
+        elif isinstance(data, Path):
+            from_file = FileSystem(data, config.application.working_directory)
+            await from_file.move(file_path.parent, new_name=file_path.name)
+        else:
+            raise FileError(f"Unknown data type passed: {type(data)}")
 
         self.size = await new_file.size()
         await session.flush()
@@ -113,8 +113,10 @@ class File(Base):
         if path == Path():
             raise FileError("Cannot find file by empty path")
 
-        parent_directory = await Directory.by_path(
-            repository, path.parent, session, config
+        parent_directory = (
+            None
+            if path.parent == Path()
+            else await Directory.by_path(repository, path.parent, session, config)
         )
 
         current_file = (
@@ -214,10 +216,10 @@ class File(Base):
         await session.flush()
         return self
 
-    async def info(self) -> Optional["FileInfo"]:
-        if self.is_public:
-            return FileInfo.model_validate(self)
-        return None
+    def info(self) -> Optional["FileInfo"]:
+        # if self.is_public:
+        return FileInfo.model_validate(self)
+        # return None
 
 
 def convert_bytes(size: int):
@@ -269,4 +271,3 @@ class FileCopyMove(BaseModel):
 
 from materia.models.repository import Repository
 from materia.models.directory import Directory
-from materia.models.filesystem import FileSystem
