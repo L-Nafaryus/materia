@@ -5,6 +5,7 @@ from materia.core.config import Config
 from materia.core.logging import Logger
 from materia.app import Application
 import asyncio
+import json
 
 
 @click.group()
@@ -110,6 +111,37 @@ def config_check(path: Path):
         logger.error("{}", e)
     else:
         logger.info("OK.")
+
+
+@cli.group()
+def export():
+    pass
+
+
+@export.command("openapi", help="Export an OpenAPI specification.")
+@click.option(
+    "--path",
+    "-p",
+    type=Path,
+    default=Path.cwd().joinpath("openapi.json"),
+    help="Path to the file.",
+)
+def export_openapi(path: Path):
+    path = path.resolve()
+    logger = Logger.new()
+    config = Config()
+    app = Application(config)
+    app.prepare_server()
+
+    logger.info("Writing file at {}", path)
+
+    try:
+        with open(path, "w") as io:
+            json.dump(app.backend.openapi(), io, sort_keys=False)
+    except Exception as e:
+        logger.error("{}", e)
+
+    logger.info("All done.")
 
 
 if __name__ == "__main__":

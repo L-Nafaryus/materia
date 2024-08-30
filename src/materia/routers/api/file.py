@@ -68,7 +68,23 @@ class FileSizeValidator:
             raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
 
 
-@router.post("/file")
+@router.post("/file", openapi_extra={
+    "requestBody" : {
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "required": ["file", "path"],
+                    "type": "object",
+                    "properties": {
+                        "file": { "type": "string", "format": "binary" },
+                        "path": { "type": "string", "format": "path", "example": "/"}
+                    }
+                }
+            }
+        },
+        "required": True
+    }
+})
 async def create(
     request: Request,
     repository: Repository = Depends(middleware.repository),

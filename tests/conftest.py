@@ -129,27 +129,7 @@ async def api_client(
     app.database = database
     app.cache = cache
     app.cron = cron
-    await app.prepare_server()
-
-    # logger = make_logger(api_config)
-
-    # @asynccontextmanager
-    # async def lifespan(app: FastAPI) -> AsyncIterator[AppContext]:
-    #    yield AppContext(
-    #        config=api_config, database=database, cache=cache, logger=logger
-    #    )
-
-    # app = FastAPI(lifespan=lifespan)
-    # app.include_router(routers.api.router)
-    # app.include_router(routers.resources.router)
-    # app.include_router(routers.root.router)
-    # app.add_middleware(
-    #    CORSMiddleware,
-    #    allow_origins=["*"],
-    #    allow_credentials=True,
-    #    allow_methods=["*"],
-    #    allow_headers=["*"],
-    # )
+    app.prepare_server()
 
     async with LifespanManager(app.backend) as manager:
         async with AsyncClient(

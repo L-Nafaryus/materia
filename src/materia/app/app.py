@@ -5,6 +5,7 @@ from typing import AsyncIterator, TypedDict, Self, Optional
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 from fastapi.middleware.cors import CORSMiddleware
 from materia.core import (
     Config,
@@ -15,6 +16,7 @@ from materia.core import (
     Cron,
 )
 from materia import routers
+from materia.core.misc import optional, optional_string
 
 
 class Context(TypedDict):
@@ -57,7 +59,7 @@ class Application:
             await app.prepare_database()
             await app.prepare_cache()
             await app.prepare_cron()
-            await app.prepare_server()
+            app.prepare_server()
         except Exception as e:
             app.logger.error(" ".join(e.args))
             sys.exit()
@@ -99,7 +101,7 @@ class Application:
             self.config.cron.workers_count, backend_url=url, broker_url=url
         )
 
-    async def prepare_server(self):
+    def prepare_server(self):
         @asynccontextmanager
         async def lifespan(app: FastAPI) -> AsyncIterator[Context]:
             yield Context(
@@ -128,6 +130,13 @@ class Application:
         self.backend.include_router(routers.api.router)
         self.backend.include_router(routers.resources.router)
         self.backend.include_router(routers.root.router)
+
+        for route in self.backend.routes:
+            if isinstance(route, APIRoute):
+                route.operation_id = (
+                    optional_string(optional(route.tags.__getitem__, 0), "{}_")
+                    + route.name
+                )
 
     async def start(self):
         self.logger.info(f"Spinning up cron workers [{self.config.cron.workers_count}]")

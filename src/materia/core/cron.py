@@ -34,10 +34,14 @@ class Cron:
     ):
         cron = Cron(
             workers_count,
+            # TODO: change log level
+            # TODO: exclude pickle
+            # TODO: disable startup banner
             Celery(
                 "cron",
                 backend=backend_url,
                 broker=broker_url,
+                broker_connection_retry_on_startup=True,
                 task_serializer="pickle",
                 accept_content=["pickle", "json"],
                 **kwargs,
