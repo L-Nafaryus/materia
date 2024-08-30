@@ -9,3 +9,6 @@ __pycache__/
 node_modules/
 *.tsbuildinfo
 *.mjs
+*.log
+
+src/client
