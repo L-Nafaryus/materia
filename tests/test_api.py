@@ -1,8 +1,6 @@
 import pytest
-from materia.config import Config
+from materia.core import Config
 from httpx import AsyncClient, Cookies
-from materia.models.base import Base
-import aiofiles
 from io import BytesIO
 
 # TODO: replace downloadable images for tests
@@ -188,6 +186,6 @@ async def test_file(auth_client: AsyncClient, api_config: Config):
     pytest_logo = BytesIO(pytest_logo_res.content)
 
     create = await auth_client.post(
-        "/api/file", files={"file": ("pytest.png", pytest_logo)}, json={"path", "/"}
+        "/api/file", files={"file": ("pytest.png", pytest_logo)}, data={"path": "/"}
     )
     assert create.status_code == 200, create.text

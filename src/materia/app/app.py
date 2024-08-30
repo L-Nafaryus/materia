@@ -29,123 +29,114 @@ class ApplicationError(Exception):
 
 
 class Application:
-    __instance__: Optional[Self] = None
-
     def __init__(
         self,
         config: Config,
-        logger: LoggerInstance,
-        database: Database,
-        cache: Cache,
-        cron: Cron,
-        backend: FastAPI,
     ):
-        if Application.__instance__:
-            raise ApplicationError("Cannot create multiple applications")
+        self.config: Config = config
+        self.logger: Optional[LoggerInstance] = None
+        self.database: Optional[Database] = None
+        self.cache: Optional[Cache] = None
+        self.cron: Optional[Cron] = None
+        self.backend: Optional[FastAPI] = None
 
-        self.config = config
-        self.logger = logger
-        self.database = database
-        self.cache = cache
-        self.cron = cron
-        self.backend = backend
+        self.prepare_logger()
 
     @staticmethod
     async def new(config: Config):
-        if Application.__instance__:
-            raise ApplicationError("Cannot create multiple applications")
-
-        logger = Logger.new(**config.log.model_dump())
+        app = Application(config)
 
         # if user := config.application.user:
         #    os.setuid(pwd.getpwnam(user).pw_uid)
         # if group := config.application.group:
         #    os.setgid(pwd.getpwnam(user).pw_gid)
-        logger.debug("Initializing application...")
+        app.logger.debug("Initializing application...")
+        await app.prepare_working_directory()
 
         try:
-            logger.debug("Changing working directory")
-            os.chdir(config.application.working_directory.resolve())
-        except FileNotFoundError as e:
-            logger.error("Failed to change working directory: {}", e)
-            sys.exit()
-
-        try:
-            logger.info("Connecting to database {}", config.database.url())
-            database = await Database.new(config.database.url())  # type: ignore
-
-            logger.info("Connecting to cache server {}", config.cache.url())
-            cache = await Cache.new(config.cache.url())  # type: ignore
-
-            logger.info("Prepairing cron")
-            cron = Cron.new(
-                config.cron.workers_count,
-                backend_url=config.cache.url(),
-                broker_url=config.cache.url(),
-            )
-
-            logger.info("Running database migrations")
-            await database.run_migrations()
+            await app.prepare_database()
+            await app.prepare_cache()
+            await app.prepare_cron()
+            await app.prepare_server()
         except Exception as e:
-            logger.error(" ".join(e.args))
+            app.logger.error(" ".join(e.args))
             sys.exit()
 
         try:
             import materia_frontend
         except ModuleNotFoundError:
-            logger.warning(
+            app.logger.warning(
                 "`materia_frontend` is not installed. No user interface will be served."
             )
 
+        return app
+
+    def prepare_logger(self):
+        self.logger = Logger.new(**self.config.log.model_dump())
+
+    async def prepare_working_directory(self):
+        try:
+            self.logger.debug("Changing working directory")
+            os.chdir(self.config.application.working_directory.resolve())
+        except FileNotFoundError as e:
+            self.logger.error("Failed to change working directory: {}", e)
+            sys.exit()
+
+    async def prepare_database(self):
+        url = self.config.database.url()
+        self.logger.info("Connecting to database {}", url)
+        self.database = await Database.new(url)  # type: ignore
+
+    async def prepare_cache(self):
+        url = self.config.cache.url()
+        self.logger.info("Connecting to cache server {}", url)
+        self.cache = await Cache.new(url)  # type: ignore
+
+    async def prepare_cron(self):
+        url = self.config.cache.url()
+        self.logger.info("Prepairing cron")
+        self.cron = Cron.new(
+            self.config.cron.workers_count, backend_url=url, broker_url=url
+        )
+
+    async def prepare_server(self):
         @asynccontextmanager
         async def lifespan(app: FastAPI) -> AsyncIterator[Context]:
-            yield Context(config=config, logger=logger, database=database, cache=cache)
+            yield Context(
+                config=self.config,
+                logger=self.logger,
+                database=self.database,
+                cache=self.cache,
+            )
 
-            if database.engine is not None:
-                await database.dispose()
+            if self.database.engine is not None:
+                await self.database.dispose()
 
-        backend = FastAPI(
+        self.backend = FastAPI(
             title="materia",
             version="0.1.0",
             docs_url="/api/docs",
             lifespan=lifespan,
         )
-        backend.add_middleware(
+        self.backend.add_middleware(
             CORSMiddleware,
             allow_origins=["http://localhost", "http://localhost:5173"],
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
         )
-        backend.include_router(routers.api.router)
-        backend.include_router(routers.resources.router)
-        backend.include_router(routers.root.router)
-
-        return Application(
-            config=config,
-            logger=logger,
-            database=database,
-            cache=cache,
-            cron=cron,
-            backend=backend,
-        )
-
-    @staticmethod
-    def instance() -> Optional[Self]:
-        return Application.__instance__
+        self.backend.include_router(routers.api.router)
+        self.backend.include_router(routers.resources.router)
+        self.backend.include_router(routers.root.router)
 
     async def start(self):
         self.logger.info(f"Spinning up cron workers [{self.config.cron.workers_count}]")
         self.cron.run_workers()
 
         try:
-            # uvicorn.run(
-            #    self.backend,
-            #    port=self.config.server.port,
-            #    host=str(self.config.server.address),
-            #    # reload = config.application.mode == "development",
-            #    log_config=Logger.uvicorn_config(self.config.log.level),
-            # )
+            self.logger.info("Running database migrations")
+            await self.database.run_migrations()
+
             uvicorn_config = uvicorn.Config(
                 self.backend,
                 port=self.config.server.port,
@@ -157,3 +148,7 @@ class Application:
             await server.serve()
         except (KeyboardInterrupt, SystemExit):
             self.logger.info("Exiting...")
+            sys.exit()
+        except Exception as e:
+            self.logger.error(" ".join(e.args))
+            sys.exit()

@@ -95,19 +95,19 @@ class Repository(Base):
         await session.refresh(user, attribute_names=["repository"])
         return user.repository
 
-    async def used(self, session: SessionContext) -> int:
+    async def used_capacity(self, session: SessionContext) -> int:
         session.add(self)
         await session.refresh(self, attribute_names=["files"])
 
         return sum([file.size for file in self.files])
 
     async def remaining_capacity(self, session: SessionContext) -> int:
-        used = await self.used(session)
+        used = await self.used_capacity(session)
         return self.capacity - used
 
     async def info(self, session: SessionContext) -> "RepositoryInfo":
         info = RepositoryInfo.model_validate(self)
-        info.used = await self.used(session)
+        info.used = await self.used_capacity(session)
 
         return info
 

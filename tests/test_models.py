@@ -1,7 +1,6 @@
 import pytest_asyncio
 import pytest
 from pathlib import Path
-from materia.config import Config
 from materia.models import (
     User,
     Repository,
@@ -9,7 +8,7 @@ from materia.models import (
     RepositoryError,
     File,
 )
-from materia.models.database import SessionContext
+from materia.core import Config, SessionContext
 from materia import security
 import sqlalchemy as sa
 from sqlalchemy.orm.session import make_transient

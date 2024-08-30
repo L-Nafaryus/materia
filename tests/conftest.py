@@ -1,27 +1,17 @@
 import pytest_asyncio
-from materia.config import Config
 from materia.models import (
-    Database,
-    Cache,
     User,
     LoginType,
 )
 from materia.models.base import Base
 from materia import security
+from materia.app import Application
+from materia.core import Config, Database, Cache, Cron
 import sqlalchemy as sa
 from sqlalchemy.pool import NullPool
-from materia.app import make_application, AppContext
-from materia._logging import make_logger
 from httpx import AsyncClient, ASGITransport, Cookies
-import asyncio
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
 from asgi_lifespan import LifespanManager
-from fastapi.middleware.cors import CORSMiddleware
-from materia import routers
 from pathlib import Path
-from copy import deepcopy
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -75,6 +65,17 @@ async def cache(config: Config) -> Cache:
     yield cache_pytest
 
 
+@pytest_asyncio.fixture(scope="session")
+async def cron(config: Config) -> Cache:
+    cron_pytest = Cron.new(
+        config.cron.workers_count,
+        backend_url=config.cache.url(),
+        broker_url=config.cache.url(),
+    )
+
+    yield cron_pytest
+
+
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def setup_database(database: Database):
     async with database.connection() as connection:
@@ -121,30 +122,36 @@ async def api_config(config: Config, tmpdir) -> Config:
 
 @pytest_asyncio.fixture(scope="function")
 async def api_client(
-    api_config: Config, database: Database, cache: Cache
+    api_config: Config, database: Database, cache: Cache, cron: Cron
 ) -> AsyncClient:
 
-    logger = make_logger(api_config)
+    app = Application(api_config)
+    app.database = database
+    app.cache = cache
+    app.cron = cron
+    await app.prepare_server()
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[AppContext]:
-        yield AppContext(
-            config=api_config, database=database, cache=cache, logger=logger
-        )
+    # logger = make_logger(api_config)
 
-    app = FastAPI(lifespan=lifespan)
-    app.include_router(routers.api.router)
-    app.include_router(routers.resources.router)
-    app.include_router(routers.root.router)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # @asynccontextmanager
+    # async def lifespan(app: FastAPI) -> AsyncIterator[AppContext]:
+    #    yield AppContext(
+    #        config=api_config, database=database, cache=cache, logger=logger
+    #    )
 
-    async with LifespanManager(app) as manager:
+    # app = FastAPI(lifespan=lifespan)
+    # app.include_router(routers.api.router)
+    # app.include_router(routers.resources.router)
+    # app.include_router(routers.root.router)
+    # app.add_middleware(
+    #    CORSMiddleware,
+    #    allow_origins=["*"],
+    #    allow_credentials=True,
+    #    allow_methods=["*"],
+    #    allow_headers=["*"],
+    # )
+
+    async with LifespanManager(app.backend) as manager:
         async with AsyncClient(
             transport=ASGITransport(app=manager.app), base_url=api_config.server.url()
         ) as client:

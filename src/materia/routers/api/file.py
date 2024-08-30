@@ -74,8 +74,7 @@ async def create(
     repository: Repository = Depends(middleware.repository),
     ctx: middleware.Context = Depends(),
 ):
-    database = await Database.new(ctx.config.database.url(), test_connection=False)
-    async with database.session() as session:
+    async with ctx.database.session() as session:
         capacity = await repository.remaining_capacity(session)
 
     try:
@@ -116,7 +115,7 @@ async def create(
         file.remove()
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Invalid path")
 
-    async with database.session() as session:
+    async with ctx.database.session() as session:
         target_directory = await validate_target_directory(
             path, repository, session, ctx.config
         )
