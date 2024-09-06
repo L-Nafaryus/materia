@@ -150,7 +150,7 @@ class Repository(BaseModel):
     capacity: int = 5 << 30
 
 
-class Config(BaseSettings, env_prefix="materia_", env_nested_delimiter="_"):
+class Config(BaseSettings, env_prefix="materia_", env_nested_delimiter="__"):
     application: Application = Application()
     log: Log = Log()
     server: Server = Server()

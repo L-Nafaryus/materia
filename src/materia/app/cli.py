@@ -15,7 +15,8 @@ def cli():
 
 @cli.command()
 @click.option("--config", type=Path)
-def start(config: Path):
+@click.option("--debug", "-d", is_flag=True, default=False, help="Enable debug output.")
+def start(config: Path, debug: bool):
     config_path = config
     logger = Logger.new()
 
@@ -47,6 +48,9 @@ def start(config: Path):
         else:
             logger.info("Using the default configuration.")
             config = Config()
+
+    if debug:
+        config.log.level = "debug"
 
     async def main():
         app = await Application.new(config)

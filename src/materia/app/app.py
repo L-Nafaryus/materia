@@ -2,11 +2,13 @@ from contextlib import _AsyncGeneratorContextManager, asynccontextmanager
 import os
 import sys
 from typing import AsyncIterator, TypedDict, Self, Optional
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from materia.core import (
     Config,
     Logger,
@@ -78,8 +80,9 @@ class Application:
 
     async def prepare_working_directory(self):
         try:
-            self.logger.debug("Changing working directory")
-            os.chdir(self.config.application.working_directory.resolve())
+            path = self.config.application.working_directory.resolve()
+            self.logger.debug(f"Changing working directory to {path}")
+            os.chdir(path)
         except FileNotFoundError as e:
             self.logger.error("Failed to change working directory: {}", e)
             sys.exit()
@@ -117,7 +120,11 @@ class Application:
         self.backend = FastAPI(
             title="materia",
             version="0.1.0",
-            docs_url="/api/docs",
+            docs_url=None,
+            redoc_url=None,
+            swagger_ui_init_oauth=None,
+            swagger_ui_oauth2_redirect_url=None,
+            openapi_url="/api/openapi.json",
             lifespan=lifespan,
         )
         self.backend.add_middleware(
@@ -127,6 +134,7 @@ class Application:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+        self.backend.include_router(routers.docs.router)
         self.backend.include_router(routers.api.router)
         self.backend.include_router(routers.resources.router)
         self.backend.include_router(routers.root.router)

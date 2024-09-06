@@ -77,7 +77,9 @@ class Database:
                 async with database.connection() as connection:
                     await connection.rollback()
             except Exception as e:
-                raise DatabaseError(f"Failed to connect to database: {url}") from e
+                raise DatabaseError(
+                    f"Failed to connect to database '{url}': {e}"
+                ) from e
 
         return database
 

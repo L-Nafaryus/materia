@@ -164,6 +164,49 @@
       postgresql-devel = bonfire.packages.x86_64-linux.postgresql;
 
       redis-devel = bonfire.packages.x86_64-linux.redis;
+
+      materia-devel = let
+        user = "materia";
+        dataDir = "/var/lib/materia";
+        entryPoint = pkgs.writeTextDir "entrypoint.sh" ''
+          materia start
+        '';
+      in
+        pkgs.dockerTools.buildImage {
+          name = "materia";
+          tag = "latest";
+
+          copyToRoot = pkgs.buildEnv {
+            name = "image-root";
+            pathsToLink = ["/bin" "/etc" "/"];
+            paths = with pkgs; [
+              bash
+              self.packages.x86_64-linux.materia
+              entryPoint
+            ];
+          };
+          runAsRoot = with pkgs; ''
+            #!${runtimeShell}
+            ${dockerTools.shadowSetup}
+            groupadd -r ${user}
+            useradd -r -g ${user} --home-dir=${dataDir} ${user}
+            mkdir -p ${dataDir}
+            chown -R ${user}:${user} ${dataDir}
+          '';
+
+          config = {
+            Entrypoint = ["bash" "/entrypoint.sh"];
+            StopSignal = "SIGINT";
+            User = "${user}:${user}";
+            WorkingDir = dataDir;
+            ExposedPorts = {
+              "54601/tcp" = {};
+            };
+            Env = [
+              "MATERIA_APPLICATION__WORKING_DIRECTORY=${dataDir}"
+            ];
+          };
+        };
     };
 
     devShells.x86_64-linux.default = pkgs.mkShell {
