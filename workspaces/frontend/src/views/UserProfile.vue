@@ -5,7 +5,7 @@ import Error from "@/components/error/Error.vue";
 import { ref, onMounted, watch, getCurrentInstance } from "vue";
 import { onBeforeRouteUpdate, useRoute } from "vue-router"
 
-import { user } from "@/api";
+import { api } from "@";
 import { useUserStore } from "@/stores";
 
 const route = useRoute();
@@ -16,11 +16,11 @@ const person = ref<user.User>(null);
 const avatar = ref<user.Image>(null);
 
 async function profile(login: string) {
-    await user.profile(login)
+    await api.user.userInfo()
         .then(async user => { person.value = user; })
         .then(async () => {
             if (person.value.avatar?.length) {
-                await user.get_avatar(person.value.avatar)
+                await api.resources.resourcesAvatars(userStore.info.avatar)
                     .then(async _avatar => { avatar.value = _avatar; })
             }
         })

@@ -2,24 +2,30 @@
 import Base from "@/views/Base.vue";
 import Error from "@/components/Error.vue";
 
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
+import { router, api, schemas, store } from "@";
 
-import router from "@/router";
-import { api } from "@";
 
 const login = defineModel("login");
 const email = defineModel("email");
 const password = defineModel("password");
 
+const userStore = store.useUser();
 const error = ref(null);
 
-async function signup() {
+onMounted(async () => {
+    if (userStore.current) {
+        router.replace({ name: "home" });
+    }
+});
+
+const signup = async () => {
     if (!login.value || !email.value || !password.value) {
         return;
     }
-    await api.auth.signup({ name: login.value, password: password.value, email: email.value })
-        .then(async user => { router.push({ path: "/auth/signin" }); })
-        .catch(err => { error.value = err.message; });
+    await api.authSignup({ body: { name: login.value, password: password.value, email: email.value }, throwOnError: true })
+        .then(async () => { router.replace({ name: "signin" }); })
+        .catch(err => { error.value = err; });
 };
 </script>
 
@@ -44,7 +50,7 @@ async function signup() {
                 <button @click="signup" class="button">Sign Up</button>
             </div>
         </form>
-        <Error v-if="error">{{ error }}</Error>
+        <Error :value="error" />
     </div>
     </Base>
 </template>

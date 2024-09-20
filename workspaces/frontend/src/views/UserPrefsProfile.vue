@@ -4,7 +4,7 @@ import Base from "@/views/Base.vue";
 import { ref, onMounted, watch, getCurrentInstance } from "vue";
 
 import router from "@/router";
-import { user } from "@/api";
+import { api } from "@";
 import { useUserStore, useMiscStore } from "@/stores";
 
 const error = ref(null);
@@ -22,7 +22,9 @@ const avatar_preview = ref(null);
 onMounted(async () => {
     miscStore.p_current_tab = 0;
 
-    login.value = userStore.current.login;
+    login.value = userStore.info.name;
+    name.value = userStore.info.full_name;
+    email.value = userStore.info.email;
 });
 
 function uploadFile(event) {

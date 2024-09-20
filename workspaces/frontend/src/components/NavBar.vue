@@ -1,7 +1,6 @@
 <template>
     <div class="relative h-12">
-        <nav
-            class="absolute w-full h-full flex justify-between items-center m-0 pl-3 pr-3 bg-ctp-mantle">
+        <nav class="absolute w-full h-full flex justify-between items-center m-0 pl-3 pr-3 bg-ctp-mantle">
             <div class="items-center m-0 flex">
                 <slot name="left"></slot>
             </div>

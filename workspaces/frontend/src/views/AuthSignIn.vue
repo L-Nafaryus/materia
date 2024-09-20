@@ -1,31 +1,30 @@
 <script setup lang="ts">
+import { ref, onMounted } from "vue";
+import { router, api, schemas, store } from "@";
+import { useRoute } from "vue-router";
 import Base from "@/views/Base.vue";
 import Error from "@/components/Error.vue";
 
-import { ref, onMounted } from "vue";
-
-import router from "@/router";
-import { api } from "@";
-import { useUserStore } from "@/stores";
 
 const email_or_username = defineModel("email_or_username");
 const password = defineModel("password");
 
-const userStore = useUserStore();
+const route = useRoute();
+const userStore = store.useUser();
 const error = ref(null);
 
 onMounted(async () => {
     if (userStore.current) {
-        router.replace({ path: "/" });
+        router.push({ name: "home" });
     }
 });
 
-async function signin() {
+const signin = async () => {
     if (!email_or_username.value || !password.value) {
         return;
     }
 
-    const body: user.UserCredentials = {
+    const body: schemas.UserCredentialsSchema = {
         name: null,
         password: password.value,
         email: null
@@ -38,12 +37,12 @@ async function signin() {
         body.name = email_or_username.value;
     }
 
-    await api.auth.signin(body)
+    await api.authSignin({ body: body, throwOnError: true })
         .then(async () => {
             //userStore.info = user_info;
-            router.push({ path: "/" });
+            router.push(route.query.redirect ? { path: route.query.redirect } : { name: "home" });
         })
-        .catch(err => { error.value = err.message; });
+        .catch(err => { error.value = err; });
 };
 </script>
 
@@ -65,7 +64,7 @@ async function signin() {
                 <button @click="$router.push('/auth/signup')" class="button">Sign Up</button>
             </div>
         </form>
-        <Error v-if="error">{{ error }}</Error>
+        <Error :value="error" />
     </div>
     </Base>
 </template>

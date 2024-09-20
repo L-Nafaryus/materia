@@ -2,14 +2,20 @@ import App from "@/App.vue";
 
 import { createApp } from "vue";
 import { createPinia } from "pinia";
+import { plugins, router, client, style } from "@";
 
-import router from "@/router";
-import { click_outside } from "@/directives/click-outside";
-import "@/assets/style.css";
+
+const debug = import.meta.hot;
+
+client.setConfig({
+    baseURL: debug ? "http://localhost:54601" : "/",
+    withCredentials: true,
+});
 
 createApp(App)
     .use(createPinia())
     .use(router)
-    .directive("click-outside", click_outside)
+    .directive("click-outside", plugins.clickOutside)
+    .directive("tooltip", plugins.tooltip)
     .mount('#app');
 

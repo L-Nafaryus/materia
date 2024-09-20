@@ -10,11 +10,16 @@
     }
 
     a {
-        @apply text-ctp-green;
+        @apply text-ctp-lavender;
     }
 
     .input {
-        @apply w-full pl-3 pr-3 pt-2 pb-2 rounded border bg-ctp-mantle border-ctp-overlay0 hover:border-ctp-overlay1 focus:border-ctp-green text-ctp-text outline-none;
+        @apply w-full pl-3 pr-3 pt-2 pb-2 rounded border bg-ctp-mantle border-ctp-overlay0 hover:border-ctp-overlay1 focus:border-ctp-lavender text-ctp-text outline-none;
+    }
+
+    .input-file {
+        @apply block w-full border rounded cursor-pointer bg-ctp-base border-ctp-surface0 text-ctp-subtext0 focus:outline-none;
+        @apply file:bg-ctp-mantle file:border-ctp-surface0 file:mr-5 file:py-2 file:px-3 file:h-full file:border-y-0 file:border-l-0 file:border-r file:text-ctp-blue hover:file:cursor-pointer hover:file:bg-ctp-base;
     }
 
     label {
@@ -22,15 +27,15 @@
     }
 
     .button {
-        @apply pt-2 pb-2 pl-5 pr-5 rounded bg-ctp-mantle hover:bg-ctp-base text-ctp-blue cursor-pointer;
+        @apply pt-1 pb-1 pl-3 pr-3 sm:pt-2 sm:pb-2 sm:pl-5 sm:pr-5 rounded bg-ctp-mantle border border-ctp-surface0 hover:bg-ctp-base text-ctp-blue cursor-pointer;
     }
 
     .link-button {
-        @apply button text-ctp-green cursor-pointer;
+        @apply button text-ctp-lavender cursor-pointer border-none;
     }
 
     .hline {
-        @apply border-t border-ctp-overlay0 ml-0 mr-0;
+        @apply border-t border-ctp-surface0 ml-0 mr-0;
     }
 
     h1 {
@@ -39,6 +44,10 @@
 
     label {
         @apply text-ctp-text;
+    }
+
+    .icon {
+        @apply inline-block select-none text-center overflow-visible w-6 h-6 stroke-ctp-text;
     }
 }
 

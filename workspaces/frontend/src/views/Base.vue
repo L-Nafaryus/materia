@@ -1,30 +1,25 @@
 <script setup lang="ts">
+import { ref, onMounted } from "vue";
+import { router, api, store } from "@";
 import NavBar from "@/components/NavBar.vue";
 import DropdownMenu from "@/components/DropdownMenu.vue";
 
-import { ref, onMounted } from "vue";
-
-import router from "@/router";
-import { user, auth } from "@/api";
-import { resources } from "@";
-import { useUserStore } from "@/stores";
-
-const userStore = useUserStore();
+const userStore = store.useUser();
 const error = ref(null);
 
-async function signout() {
-    await auth.signout()
+const signout = async () => {
+    await api.authSignout()
         .then(async () => {
             userStore.clear();
             router.push({ path: "/" });
         })
-        .catch(error => { error.value = error; });
-}
+        .catch(err => { error.value = err; });
+};
 
 </script>
 
 <template>
-    <div class="flex-grow pb-20">
+    <div class="flex-grow sm:pb-20">
         <NavBar>
             <template #left>
                 <RouterLink class="link-button" to="/">Home</RouterLink>
@@ -62,13 +57,12 @@ async function signout() {
             </template>
         </NavBar>
 
-        <main class="w-[1000px] ml-auto mr-auto pt-5 pb-5">
+        <main class="w-full max-w-[1000px] ml-auto mr-auto">
             <slot></slot>
         </main>
     </div>
 
-    <div class="relative overflow-hidden h-full ">
-    </div>
+
     <footer class="flex justify-between pb-2 pt-2 pl-5 pr-5 bg-ctp-mantle">
         <a href="/">Made with glove by Elnafo, 2024</a>
         <div>

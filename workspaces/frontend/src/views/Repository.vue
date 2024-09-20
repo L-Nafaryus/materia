@@ -4,157 +4,106 @@ import Error from "@/components/Error.vue";
 import IconDirectory from "@/components/icons/IconDirectory.vue";
 import IconFile from "@/components/icons/IconFile.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
+import DragItem from "@/components/DragItem.vue";
+import DropItem from "@/components/DropItem.vue";
+import RepositoryBrowser from "@/components/RepositoryBrowser.vue";
+import Modal from "@/components/Modal.vue";
+import Uploader from "@/components/Uploader.vue";
 
-import { ref, onMounted, watch } from "vue";
+import { ref, shallowRef, onMounted, watch } from "vue";
 import { onBeforeRouteUpdate, useRoute } from "vue-router"
+import { filesize } from "filesize";
+import { router, api, store, types, api_types, check_auth } from "@";
 
-import { repository } from "@/api";
-import { useUserStore } from "@/stores";
-import router from "@/router";
 
 const route = useRoute();
-const userStore = useUserStore();
-const error = ref<string>(null);
-
-const repository_info = ref(null);
-const is_created = ref(null);
-const repository_content = ref(null);
+const userStore = store.useUser();
+const repoStore = store.useRepository();
+const error = ref<object>(null);
 
 onMounted(async () => {
-    await repository.info()
-        .then(async _repository_info => {
-            is_created.value = true;
-            repository_info.value = _repository_info;
-        })
-        .catch(err => {
-            is_created.value = false;
-        });
-
-    if (is_created.value) {
-        await repository.content()
-            .then(async _repository_content => {
-                repository_content.value = _repository_content;
-            })
-            .catch(err => {
-                error.value = err;
-            })
-    }
+    let path = route.params.pathMatch ? "/" + route.params.pathMatch.join("/") : "/";
+    await repoStore.refreshInfo(path, error);
+    console.log(route);
 });
 
-async function create_repository() {
-    await repository.create()
-        .then(async () => {
-            await repository.info()
-                .then(async _repository_info => {
-                    repository_info.value = _repository_info;
-                })
-                .catch(err => {
-                    error.value = err;
-                });
+onBeforeRouteUpdate(async (to, from) => {
+    let path = to.params.pathMatch ? "/" + to.params.pathMatch.join("/") : "/";
+    userStore.checkAuthorizationRedirect(to.path);
+    await repoStore.refreshInfo(path, error);
+    console.log("route", route);
+    console.log("store", repoStore);
+});
 
-            is_created.value = true;
-        })
-        .catch(err => {
-            error.value = err;
-        })
-}
 
-function round_size(size: number, mesure: string) {
-    if (mesure == "GB") {
-        return size / 8 / 1024 / 1024;
-    } else if (mesure == "MB") {
-        return size / 8 / 1024;
-    }
-}
+const isUploaderOpen = ref(false);
 
-function size_procent() {
-    return Math.round(repository_info.value.used / repository_info.value.capacity) * 100;
-}
-
-function format_creation_time(timestamp: number): string {
-    const date = new Date(timestamp * 1000);
-
-    return `${date.getDate()}-${date.getMonth()}-${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}`;
-}
-
-const showMenu = ref(false);
-const ctxMenuPosX = ref(0);
-const ctxMenuPosY = ref(0);
-const targetRow = ref({});
-const contextMenuActions = ref([
-    { label: 'Edit', action: 'edit' },
-    { label: 'Delete', action: 'delete' },
-]);
-
-const showContextMenu = (event, user) => {
-    event.preventDefault();
-    showMenu.value = true;
-    targetRow.value = user;
-    ctxMenuPosX.value = event.clientX;
-    ctxMenuPosY.value = event.clientY;
+const openUploader = () => {
+    isUploaderOpen.value = true;
+};
+const closeUploader = () => {
+    isUploaderOpen.value = false;
 };
 
-const closeContextMenu = () => {
-    showMenu.value = false;
+const isMakeDirectoryOpen = ref(false);
+const makeDirectoryName = ref(null);
+
+const openMakeDirectory = () => {
+    isMakeDirectoryOpen.value = true;
 };
 
-function handleActionClick(action) {
-    console.log(action);
-    console.log(targetRow.value);
-}
+const closeMakeDirectory = () => {
+    isMakeDirectoryOpen.value = false;
+    makeDirectoryName.value = null;
+};
 
-function close_menu() {
-    showMenu.value = false;
-}
+const makeDirectory = async () => {
+    await repoStore.makeDirectory(makeDirectoryName.value.value, error);
+    closeMakeDirectory();
+};
 
+// repoStore.makeDirectory('test', error)
 </script>
 
 <template>
     <Base>
-    <Error v-if="error">{{ error }}</Error>
-    <section v-if="is_created">
-        <div class="flex items-center">
-            <div class="w-full rounded-full h-2.5 bg-ctp-surface0">
-                <div class="bg-ctp-lavender h-2.5 rounded-full" :style="{ width: size_procent() + '%' }"></div>
-            </div>
-            <span class="min-w-48 text-center">{{ round_size(repository_info.used, "MB").toFixed(2) }} MB / {{
-                round_size(repository_info.capacity, "GB") }} GB</span>
+    <Error :value="error" />
 
+    <Uploader v-if="repoStore.isCreated" :isOpen="isUploaderOpen" @close-uploader="closeUploader()" />
+
+    <Modal :isOpen="isMakeDirectoryOpen" @close-modal="closeMakeDirectory()">
+        <template #header>
+            <h2>Create directory</h2>
+        </template>
+        <template #content>
+            <div class="flex mb-8">
+                <input ref="makeDirectoryName" class="input mr-2">
+                <button class="button" @click="makeDirectory()">Create</button>
+            </div>
+        </template>
+    </Modal>
+    <section v-if="repoStore.isCreated">
+        <div
+            class="flex items-center justify-center fixed bottom-4 bg-ctp-surface0 sm:bg-ctp-crust opacity-90 sm:opacity-100 w-full sm:w-auto sm:relative sm:bottom-auto sm:right-auto my-2">
+            <span class="min-w-48 text-center">{{ filesize(repoStore.info.used)
+                }}
+                / {{ filesize(repoStore.info.capacity)
+                }}</span>
+            <div class="hidden sm:inline ml-4 mr-4 w-full rounded-full h-2.5 bg-ctp-surface0">
+                <div class="bg-ctp-lavender h-2.5 rounded-full" :style="{ width: repoStore.sizePercent() + '%' }"></div>
+            </div>
+
+            <button @click="openMakeDirectory" class="button justify-end mr-2">Create</button>
+            <button @click="openUploader" class="button justify-end">Upload</button>
         </div>
 
-        <table v-if="repository_content" class="table-auto w-full mt-8 mb-8 pl-8 pr-8 text-ctp-text">
-            <tbody>
-                <tr class="hover:bg-ctp-surface0" v-for="directory in repository_content.directories"
-                    @contextmenu.prevent="showContextMenu($event, directory)">
-                    <td>
-                        <IconDirectory />
-                        <div class="inline ml-4">{{ directory.name }}</div>
-                    </td>
-                    <td class="text-right">-</td>
-                    <td class="text-right w-48">
-                        {{ format_creation_time(directory.created) }}
-                    </td>
-                </tr>
-                <tr class="hover:bg-ctp-surface0" v-for="file in repository_content.files">
-                    <td>
-                        <IconFile />
-                        <div class="inline ml-4">{{ file.name }}</div>
-                    </td>
-                    <td class="text-right">{{ round_size(file.size, "MB").toFixed(2) }} MB</td>
-                    <td class="text-right w-48">
-                        {{ format_creation_time(file.created) }}
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <RepositoryBrowser v-if="!error" v-model="repoStore.content" />
 
-        <ContextMenu v-if="showMenu" :actions="contextMenuActions" @action-clicked="handleActionClick" :x="ctxMenuPosX"
-            :y="ctxMenuPosY" v-click-outside="close_menu" />
     </section>
     <section v-else>
         <p>It looks like you don't have a repository yet...</p>
         <div class="flex justify-center mt-8">
-            <button @click="create_repository" class="button">+ Create repository</button>
+            <button @click="repoStore.create(error)" class="button">+ Create repository</button>
         </div>
     </section>
     </Base>
