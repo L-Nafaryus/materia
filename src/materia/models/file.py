@@ -216,10 +216,12 @@ class File(Base):
         await session.flush()
         return self
 
-    def info(self) -> Optional["FileInfo"]:
-        # if self.is_public:
-        return FileInfo.model_validate(self)
-        # return None
+    async def info(self, session: SessionContext) -> Optional["FileInfo"]:
+        info = FileInfo.model_validate(self)
+        relative_path = await self.relative_path(session)
+        info.path = Path("/").joinpath(relative_path) if relative_path else None
+
+        return info
 
 
 def convert_bytes(size: int):
@@ -251,6 +253,8 @@ class FileInfo(BaseModel):
     name: str
     is_public: bool
     size: int
+
+    path: Optional[Path] = None
 
 
 class FilePath(BaseModel):

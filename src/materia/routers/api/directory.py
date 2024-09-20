@@ -4,6 +4,7 @@ from materia.models import (
     User,
     Directory,
     DirectoryInfo,
+    DirectoryContent,
     DirectoryPath,
     DirectoryRename,
     DirectoryCopyMove,
@@ -171,3 +172,27 @@ async def copy(
 
         await directory.copy(target_directory, session, ctx.config, force=data.force)
         await session.commit()
+
+
+@router.get("/directory/content", response_model=DirectoryContent)
+async def content(
+    path: Path,
+    repository: Repository = Depends(middleware.repository),
+    ctx: middleware.Context = Depends(),
+):
+    async with ctx.database.session() as session:
+        directory = await validate_current_directory(
+            path, repository, session, ctx.config
+        )
+        session.add(directory)
+        await session.refresh(directory, attribute_names=["directories"])
+        await session.refresh(directory, attribute_names=["files"])
+
+        content = DirectoryContent(
+            files=[await _file.info(session) for _file in directory.files],
+            directories=[
+                await _directory.info(session) for _directory in directory.directories
+            ],
+        )
+
+    return content

@@ -16,6 +16,7 @@ from materia.models.directory import (
     Directory,
     DirectoryLink,
     DirectoryInfo,
+    DirectoryContent,
     DirectoryPath,
     DirectoryRename,
     DirectoryCopyMove,

@@ -63,21 +63,11 @@ async def content(
         await session.refresh(repository, attribute_names=["directories"])
         await session.refresh(repository, attribute_names=["files"])
 
-    content = RepositoryContent(
-        files=list(
-            map(
-                lambda file: FileInfo.model_validate(file),
-                filter(lambda file: file.path is None, repository.files),
-            )
-        ),
-        directories=list(
-            map(
-                lambda directory: DirectoryInfo.model_validate(directory),
-                filter(
-                    lambda directory: directory.path is None, repository.directories
-                ),
-            )
-        ),
-    )
+        content = RepositoryContent(
+            files=[await _file.info(session) for _file in repository.files],
+            directories=[
+                await _directory.info(session) for _directory in repository.directories
+            ],
+        )
 
     return content

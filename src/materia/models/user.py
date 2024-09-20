@@ -139,9 +139,6 @@ class User(Base):
     def info(self) -> "UserInfo":
         user_info = UserInfo.model_validate(self)
 
-        if user_info.is_email_private:
-            user_info.email = None
-
         return user_info
 
     async def edit_avatar(

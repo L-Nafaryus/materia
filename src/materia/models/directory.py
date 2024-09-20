@@ -59,11 +59,11 @@ class Directory(Base):
 
         if self.directories:
             for directory in self.directories:
-                directory.remove(session, config)
+                await directory.remove(session, config)
 
         if self.files:
             for file in self.files:
-                file.remove(session, config)
+                await file.remove(session, config)
 
         repository_path = await self.repository.real_path(session, config)
         directory_path = await self.real_path(session, config)
@@ -284,6 +284,12 @@ class DirectoryInfo(BaseModel):
     used: Optional[int] = None
 
 
+class DirectoryContent(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    files: list["FileInfo"]
+    directories: list["DirectoryInfo"]
+
+
 class DirectoryPath(BaseModel):
     path: Path
 
@@ -301,4 +307,4 @@ class DirectoryCopyMove(BaseModel):
 
 
 from materia.models.repository import Repository
-from materia.models.file import File
+from materia.models.file import File, FileInfo
