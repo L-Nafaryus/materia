@@ -1,7 +1,7 @@
 [project]
 name = "materia"
 version = "0.1.1"
-description = "Materia is a file server"
+description = "Materia is a simple and fast cloud storage"
 authors = [
     {name = "L-Nafaryus", email = "l.nafaryus@gmail.com"},
 ]
@@ -43,11 +43,26 @@ requires-python = ">=3.12,<3.13"
 readme = "README.md"
 license = {text = "MIT"}
 
+[project.optional-dependencies]
+docs = [
+    "mkdocs-material>=9.5.38",
+    "mkdocstrings-python>=1.11.1",
+    "griffe-typingdoc>=0.2.7",
+    "pymdown-extensions>=10.11",
+]
+frontend = [
+    "materia-frontend>=0.1.1",
+]
+all = [
+    "materia[docs,frontend]",
+]
+
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
 [project.scripts]
+
 materia = "materia.app.cli:cli"
 
 [tool.pyright]
@@ -57,9 +72,9 @@ reportGeneralTypeIssues = false
 pythonpath = ["."]
 testpaths = ["tests"]
 
-
 [tool.pdm]
 distribution = true
+
 [tool.pdm.dev-dependencies]
 dev = [
     "-e file:///${PROJECT_ROOT}/workspaces/frontend",
@@ -70,9 +85,6 @@ dev = [
     "pytest-asyncio>=0.23.7",
     "asgi-lifespan>=2.1.0",
     "pytest-cov>=5.0.0",
-    "mkdocs-material>=9.5.34",
-    "mkdocstrings-python>=1.10.9",
-    "griffe-typingdoc>=0.2.6",
 ]
 
 [tool.pdm.build]
@@ -86,3 +98,17 @@ rev.cmd = "alembic revision {args:--autogenerate}"
 upgrade.cmd = "alembic upgrade {args:head}"
 downgrade.cmd = "alembic downgrade {args:base}"
 remove-revs.shell = "rm -v ./src/materia/models/migrations/versions/*.py"
+docs.shell = "pdm run mkdocs build -d src/materia/docs/"
+pre_build.composite = [ "docs" ]
+
+[tool.pdm.resolution]
+respect-source-order = true
+
+[[tool.pdm.source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+
+[[tool.pdm.source]]
+name = "elnafo-vcs"
+url = "https://vcs.elnafo.ru/api/packages/L-Nafaryus/pypi"
+verify_ssl = true

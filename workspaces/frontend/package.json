@@ -1,6 +1,6 @@
 {
-    "name": "materia-frontend",
-    "version": "0.0.5",
+    "name": "materia-frontend-vue",
+    "version": "0.1.1",
     "private": true,
     "type": "module",
     "scripts": {
@@ -9,8 +9,7 @@
         "preview": "vite preview",
         "build": "vite build",
         "type-check": "vue-tsc --build --force",
-        "generate-client": "openapi --input ./openapi.json --output ./src/client_old/ --client axios --name Client",
-        "openapi-ts": "openapi-ts --input ./openapi.json --output ./src/client/ --client @hey-api/client-axios"
+        "openapi": "openapi-ts --input ./openapi.json --output ./src/client/ --client @hey-api/client-axios"
     },
     "dependencies": {
         "@catppuccin/tailwindcss": "^0.1.6",
@@ -32,7 +31,6 @@
         "@vitejs/plugin-vue-jsx": "^3.1.0",
         "@vue/tsconfig": "^0.5.0",
         "npm-run-all2": "^6.1.1",
-        "openapi-typescript-codegen": "^0.29.0",
         "typescript": "~5.3.0",
         "vite": "^5.0.10",
         "vue-tsc": "^2.0.29"

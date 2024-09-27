@@ -92,7 +92,7 @@ class Cache(BaseModel):
                     self.scheme, self.address, self.port, self.database
                 )
         else:
-            raise NotImplemented()
+            raise NotImplementedError()
 
 
 class Security(BaseModel):
@@ -110,7 +110,7 @@ class OAuth2(BaseModel):
     # check if signing algo need a key or generate it | HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512, EdDSA
     jwt_signing_key: Optional[Union[str, Path]] = None
     jwt_secret: Optional[Union[str, Path]] = (
-        None  # only for HS256, HS384, HS512 | generate
+        "changeme" # None  # only for HS256, HS384, HS512 | generate
     )
     access_token_lifetime: int = 3600
     refresh_token_lifetime: int = 730 * 60

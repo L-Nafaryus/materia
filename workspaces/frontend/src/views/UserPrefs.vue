@@ -3,9 +3,9 @@ import Base from "@/views/Base.vue";
 
 import { ref, onMounted, watch, getCurrentInstance } from "vue";
 
-import { useMiscStore } from "@/stores";
+import { store } from "@";
 
-const miscStore = useMiscStore();
+const miscStore = store.useMisc();
 
 </script>
 

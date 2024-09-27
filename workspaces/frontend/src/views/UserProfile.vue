@@ -5,11 +5,10 @@ import Error from "@/components/error/Error.vue";
 import { ref, onMounted, watch, getCurrentInstance } from "vue";
 import { onBeforeRouteUpdate, useRoute } from "vue-router"
 
-import { api } from "@";
-import { useUserStore } from "@/stores";
+import { api, store } from "@";
 
 const route = useRoute();
-const userStore = useUserStore();
+const userStore = store.useUser();
 const error = ref<string>(null);
 
 const person = ref<user.User>(null);

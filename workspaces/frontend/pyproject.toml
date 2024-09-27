@@ -26,10 +26,12 @@ dev = [
 includes = [ "src/materia_frontend" ]
 
 [tool.pdm.scripts]
+openapi-json.cmd = "pdm run -p ../../ python -m materia export openapi --path ./openapi.json"
 npm-install.cmd = "npm install --prefix ./"
+openapi-client.cmd = "npm run openapi"
 npm-run-build.cmd = "npm run build --prefix ./"
 move-dist.shell = "rm -vrf src/materia_frontend/dist && mv -v dist src/materia_frontend/ && cp -v templates/* src/materia_frontend/dist"
-pre_build.composite = [ "npm-install", "npm-run-build", "move-dist" ]
+pre_build.composite = [ "openapi-json", "npm-install", "openapi-client", "npm-run-build", "move-dist" ]
 materia-frontend.call = "materia_frontend.main:client"
 
 [build-system]

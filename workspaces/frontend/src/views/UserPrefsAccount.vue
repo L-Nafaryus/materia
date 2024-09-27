@@ -3,8 +3,7 @@ import Base from "@/views/Base.vue";
 
 import { ref, onMounted, watch, getCurrentInstance } from "vue";
 
-import router from "@/router";
-import { useUserStore, useMiscStore } from "@/stores";
+import { router, store } from "@";
 
 const password = defineModel("password");
 const new_password = defineModel("new-password");
@@ -16,8 +15,8 @@ const new_email = defineModel("new-email");
 const confirm_password = defineModel("confirm-password");
 
 const error = ref(null);
-const userStore = useUserStore();
-const miscStore = useMiscStore();
+const userStore = store.useUser();
+const miscStore = store.useMisc();
 
 onMounted(async () => {
     miscStore.p_current_tab = 1;

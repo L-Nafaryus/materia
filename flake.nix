@@ -43,15 +43,54 @@
       // {inherit meta;};
   in {
     packages.x86_64-linux = {
-      materia-frontend-nodejs = dreamBuildPackage {
+      materia-server = dreamBuildPackage {
+        module = {
+          config,
+          lib,
+          dream2nix,
+          ...
+        }: {
+          imports = [dream2nix.modules.dream2nix.WIP-python-pdm];
+
+          pdm.lockfile = ./pdm.lock;
+          pdm.pyproject = ./pyproject.toml;
+
+          deps = _: {
+            python = pkgs.python312;
+          };
+
+          mkDerivation = {
+            src = ./.;
+            buildInputs = [
+              pkgs.python312.pkgs.pdm-backend
+            ];
+            nativeBuildInputs = [
+              pkgs.python312.pkgs.wrapPython
+            ];
+            configurePhase = ''
+              ${lib.getExe pkgs.mkdocs} build -d src/materia/docs/
+            '';
+            # TODO: include docs
+          };
+        };
+        meta = with nixpkgs.lib; {
+          description = "Materia";
+          license = licenses.mit;
+          maintainers = with bonLib.maintainers; [L-Nafaryus];
+          broken = false;
+          mainProgram = "materia";
+        };
+      };
+
+      materia-frontend-vue = dreamBuildPackage {
         module = {
           lib,
           config,
           dream2nix,
           ...
         }: {
-          name = "materia-frontend";
-          version = "0.0.5";
+          name = "materia-frontend-vue";
+          version = "0.1.1";
 
           imports = [
             dream2nix.modules.dream2nix.WIP-nodejs-builder-v3
@@ -59,6 +98,10 @@
 
           mkDerivation = {
             src = ./workspaces/frontend;
+            configurePhase = ''
+              ${self.packages.x86_64-linux.materia-server}/bin/materia export openapi --path ./
+              npm run openapi
+            '';
           };
 
           deps = {nixpkgs, ...}: {
@@ -83,13 +126,13 @@
 
       materia-frontend = dreamBuildPackage {
         extraArgs = {
-          inherit (self.packages.x86_64-linux) materia-frontend-nodejs;
+          inherit (self.packages.x86_64-linux) materia-frontend-vue;
         };
         module = {
           config,
           lib,
           dream2nix,
-          materia-frontend-nodejs,
+          materia-frontend-vue,
           ...
         }: {
           imports = [dream2nix.modules.dream2nix.WIP-python-pdm];
@@ -107,7 +150,7 @@
               pkgs.python312.pkgs.pdm-backend
             ];
             configurePhase = ''
-              cp -rv ${materia-frontend-nodejs}/dist ./src/materia_frontend/
+              cp -rv ${materia-frontend-vue}/dist ./src/materia_frontend/
             '';
           };
         };

@@ -3,13 +3,11 @@ import Base from "@/views/Base.vue";
 
 import { ref, onMounted, watch, getCurrentInstance } from "vue";
 
-import router from "@/router";
-import { api } from "@";
-import { useUserStore, useMiscStore } from "@/stores";
+import { api, router, store } from "@";
 
 const error = ref(null);
-const userStore = useUserStore();
-const miscStore = useMiscStore();
+const userStore = store.useUser();
+const miscStore = store.useMisc();
 
 const login = defineModel("login");
 const name = defineModel("name");

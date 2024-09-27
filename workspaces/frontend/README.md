@@ -1,16 +1,7 @@
 # materia-frontend
 
-## Building (npm)
+**Documentation**: [https://storage.elnafo.ru/docs](https://storage.elnafo.ru/docs)
 
-```sh
-npm install
-npm run build 
-```
+**Source**: [https://vcs.elnafo.ru/L-Nafaryus/materia](https://vcs.elnafo.ru/L-Nafaryus/materia)
 
-## Building / installing (pdm)
-
-```sh
-pdm build 
-pdm install --prod --no-editable
-```
-
+This is part of the Materia project.
