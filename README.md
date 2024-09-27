@@ -1,11 +1,7 @@
 # Materia
 
-<style>
-.md-content .md-typeset h1 { display: none; }
-</style>
-
 <p align="center">
-  <a href="https://materia.elnafo.ru"><img src="https://vcs.elnafo.ru/L-Nafaryus/materia/src/branch/master/docs/img/logo-full.png" alt="Materia"></a>
+  <a href="https://materia.elnafo.ru"><img src="https://vcs.elnafo.ru/L-Nafaryus/materia/raw/branch/master/docs/img/logo-full.png" alt="Materia"></a>
 </p>
 <p align="center">
   <img src="https://img.shields.io/badge/nix%20flake-gray.svg?logo=nixos" alt="nix-flake"/>
