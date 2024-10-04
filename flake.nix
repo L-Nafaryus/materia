@@ -61,25 +61,34 @@
 
           mkDerivation = {
             src = ./.;
-            buildInputs = [
-              pkgs.python312.pkgs.pdm-backend
-            ];
+            buildInputs =
+              [
+                config.deps.python.pkgs.pdm-backend
+              ]
+              ++ map (x: (pkgs.lib.head (pkgs.lib.attrValues x)).public) (
+                pkgs.lib.attrValues (config.groups.docs.packages)
+              );
             nativeBuildInputs = [
               pkgs.python312.pkgs.wrapPython
             ];
             configurePhase = ''
-              ${lib.getExe pkgs.mkdocs} build -d src/materia/docs/
+              python -m mkdocs build -d src/materia/docs/
             '';
             # TODO: include docs
           };
         };
-        meta = with nixpkgs.lib; {
-          description = "Materia";
-          license = licenses.mit;
-          maintainers = with bonLib.maintainers; [L-Nafaryus];
-          broken = false;
-          mainProgram = "materia";
-        };
+      };
+
+      materia-frontend-vue-source = pkgs.stdenv.mkDerivation {
+        pname = "materia-frontend-vue-source";
+        version = "0.1.1";
+        src = ./workspaces/frontend;
+        phases = ["installPhase"];
+        installPhase = ''
+          mkdir -p $out
+          cp -r $src/* $out
+          ${self.packages.x86_64-linux.materia-server}/bin/materia export openapi --path $out/openapi.json
+        '';
       };
 
       materia-frontend-vue = dreamBuildPackage {
@@ -97,11 +106,10 @@
           ];
 
           mkDerivation = {
-            src = ./workspaces/frontend;
-            configurePhase = ''
-              ${self.packages.x86_64-linux.materia-server}/bin/materia export openapi --path ./
-              npm run openapi
-            '';
+            src = builtins.path {
+              name = "source";
+              path = self.packages.x86_64-linux.materia-frontend-vue-source;
+            };
           };
 
           deps = {nixpkgs, ...}: {
@@ -151,6 +159,8 @@
             ];
             configurePhase = ''
               cp -rv ${materia-frontend-vue}/dist ./src/materia_frontend/
+              chmod 755 ./src/materia_frontend/dist
+              cp -rv templates/* ./src/materia_frontend/dist/
             '';
           };
         };

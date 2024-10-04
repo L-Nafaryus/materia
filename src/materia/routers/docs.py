@@ -1,8 +1,5 @@
-from fastapi import APIRouter, Request, Response, status, HTTPException, Depends
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-import mimetypes
+from fastapi import APIRouter, Request, status, HTTPException, Depends
+from fastapi.responses import FileResponse, RedirectResponse
 from pathlib import Path
 from materia.core.misc import optional
 from materia.routers import middleware
@@ -16,6 +13,10 @@ try:
 except ImportError:
     pass
 else:
+
+    @router.get("/docs", include_in_schema=False)
+    async def docs_root():
+        return RedirectResponse(url="/docs/")
 
     @router.get("/docs/{catchall:path}", include_in_schema=False)
     async def docs(request: Request, ctx: middleware.Context = Depends()):

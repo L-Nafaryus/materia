@@ -54,7 +54,7 @@ frontend = [
     "materia-frontend>=0.1.1",
 ]
 all = [
-    "materia[docs,frontend]",
+    "materia[frontend]",
 ]
 
 [build-system]

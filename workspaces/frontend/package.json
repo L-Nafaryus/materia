@@ -7,9 +7,9 @@
         "dev": "vite",
         "build-check": "run-p type-check \"build-only {@}\" --",
         "preview": "vite preview",
-        "build": "vite build",
+        "build": "npm run openapi && vite build",
         "type-check": "vue-tsc --build --force",
-        "openapi": "openapi-ts --input ./openapi.json --output ./src/client/ --client @hey-api/client-axios"
+        "openapi": "./node_modules/@hey-api/openapi-ts/bin/index.cjs --input ./openapi.json --output ./src/client/ --client @hey-api/client-axios"
     },
     "dependencies": {
         "@catppuccin/tailwindcss": "^0.1.6",

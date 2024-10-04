@@ -1,5 +1,5 @@
 from pathlib import Path
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -15,5 +15,4 @@ else:
 
     @router.get("/{spa:path}", response_class=HTMLResponse, include_in_schema=False)
     async def root(request: Request):
-        # raise HTTPException(404)
         return templates.TemplateResponse(request, "base.html", {"view": "app"})
