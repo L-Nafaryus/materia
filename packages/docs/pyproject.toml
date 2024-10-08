@@ -1,0 +1,40 @@
+[project]
+name = "materia-docs"
+version = "0.1.1"
+description = "Materia documentation"
+authors = [
+    {name = "L-Nafaryus", email = "l.nafaryus@gmail.com"},
+]
+dependencies = [
+    "mkdocs-material>=9.5.38",
+    "mkdocstrings-python>=1.11.1",
+    "griffe-typingdoc>=0.2.7",
+    "pymdown-extensions>=10.11",
+    "black<24.0.0,>=23.3.0",
+]
+requires-python = ">=3.12,<3.13"
+license = {text = "MIT"}
+
+[project.urls]
+Homepage = "https://materia.elnafo.ru"
+Repository = "https://github.com/L-Nafaryus/materia"
+Documentation = "https://materia.elnafo.ru/docs"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.build]
+package-dir = "target"
+includes = ["target/materia_docs"]
+
+[tool.pdm.scripts]
+# mkdocs creates "target/materia_docs"
+mkdocs-build.cmd = "mkdocs build"
+top-level.shell = "touch target/materia_docs/__init__.py"
+pre_build.composite = [ "mkdocs-build", "top-level" ]
+
+doc.cmd = "mkdocs serve"

@@ -1,0 +1,16 @@
+dist/
+/.venv
+__pycache__/
+
+.pdm.toml
+.pdm-python
+.pdm-build/
+
+node_modules/
+*.tsbuildinfo
+*.mjs
+*.log
+
+#openapi.json
+/target
+src/client

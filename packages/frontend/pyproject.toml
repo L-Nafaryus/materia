@@ -1,0 +1,35 @@
+[project]
+name = "materia-frontend"
+version = "0.1.2"
+description = "Materia is a simple and fast cloud storage (frontend)"
+authors = [
+    {name = "L-Nafaryus", email = "l.nafaryus@gmail.com"},
+]
+requires-python = ">=3.12,<3.13"
+license = {text = "MIT"}
+
+[project.urls]
+Homepage = "https://materia.elnafo.ru"
+Repository = "https://github.com/L-Nafaryus/materia"
+Documentation = "https://materia.elnafo.ru/docs"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.build]
+package-dir = "target"
+includes = ["target/materia_frontend"]
+
+[tool.pdm.scripts]
+npm-install.cmd = "npm install"
+openapi-client.cmd = "npm run openapi"
+npm-build.cmd = "npm run simple-build -- --outDir target/materia_frontend"
+top-level.shell = "touch target/materia_frontend/__init__.py"
+copy-templates.shell = "cp -r ./templates target/materia_frontend/"
+pre_build.composite = [ "npm-install", "openapi-client", "npm-build", "top-level", "copy-templates" ]
+
+openapi-json.cmd = "pdm run -p ../server python -m materia_server export openapi --path ./openapi.json"
